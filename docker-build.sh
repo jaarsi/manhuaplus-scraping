@@ -1,3 +1,2 @@
 #!/bin/bash
-poetry build \
-    && docker compose build
+rm dist/* && poetry build && docker compose build

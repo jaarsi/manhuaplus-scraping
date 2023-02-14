@@ -1,14 +1,15 @@
-#!.venv/bin/python
-import os
 import asyncio
-import requests
 import logging
-from redis import Redis
+import os
+
+import requests
 from playwright.async_api import async_playwright
+from redis import Redis
 
-
-WEBHOOK_URL = "https://discord.com/api/webhooks/1046665729166020648/"\
+WEBHOOK_URL = (
+    "https://discord.com/api/webhooks/1046665729166020648/"
     "BhO1w3r65bDEol449m9H39qrEbfOacFSq6jCR4RawMUviIozGqq3CNNDn5c5g3PvBDGV"
+)
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", 120))
@@ -28,7 +29,7 @@ def main():
 
 def send_discord_message(message: str):
     try:
-        requests.post(WEBHOOK_URL, json={ "content": message, "flags": 4 })
+        requests.post(WEBHOOK_URL, json={"content": message, "flags": 4})
     except:
         pass
 
@@ -39,12 +40,19 @@ async def worker():
 
         try:
             page = await browser.new_page()
-            await page.goto("https://manhuaplus.com/manga/martial-peak/", wait_until="domcontentloaded")
-            element = await page.locator(".wp-manga-chapter:nth-child(1) a").element_handle()
+            await page.goto(
+                "https://manhuaplus.com/manga/martial-peak/",
+                wait_until="domcontentloaded",
+            )
+            element = await page.locator(
+                ".wp-manga-chapter:nth-child(1) a"
+            ).element_handle()
             _, value, *_ = (await element.text_content()).split()
             last_chapter_available = int(value)
             last_chapter_available_link = await element.get_attribute("href")
-            last_chapter_saved = int(redis.get("last_chapter") or last_chapter_available)
+            last_chapter_saved = int(
+                redis.get("last_chapter") or last_chapter_available
+            )
             redis.set("last_chapter", last_chapter_available)
 
             if last_chapter_available <= last_chapter_saved:
