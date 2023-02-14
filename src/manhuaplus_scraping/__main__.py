@@ -2,7 +2,6 @@ import asyncio
 import logging
 import os
 from dataclasses import dataclass, field
-from itertools import cycle
 
 import requests
 import toml
@@ -51,7 +50,8 @@ def main():
 def send_discord_new_chapter_notification(task_result: ScrapingTaskResult):
     message = (
         f"[ {task_result.serie.title} ] "
-        "New Chapter Available {task_result.last_chapter_saved} => {task_result.new_chapter_available}\n"
+        f"New Chapter Available {task_result.last_chapter_saved} => "
+        f"{task_result.new_chapter_available}\n"
         f"{task_result.new_chapter_url}"
     )
 
@@ -59,11 +59,13 @@ def send_discord_new_chapter_notification(task_result: ScrapingTaskResult):
         requests.post(
             task_result.serie.discord_wh, json={"content": message, "flags": 4}
         )
-    except:
+    except Exception:
         pass
 
 
-async def check_new_chapter_task(browser: Browser, serie: Serie) -> ScrapingTaskResult:
+async def check_new_chapter_task(
+    browser: Browser, serie: Serie
+) -> ScrapingTaskResult:
     try:
         page = await browser.new_page()
         await page.goto(serie.url, wait_until="domcontentloaded")
@@ -72,7 +74,8 @@ async def check_new_chapter_task(browser: Browser, serie: Serie) -> ScrapingTask
         last_chapter_available = int(value)
         last_chapter_available_link = await element.get_attribute("href")
         last_chapter_saved = int(
-            redis.hget(serie.store_key, "last-chapter") or last_chapter_available
+            redis.hget(serie.store_key, "last-chapter")
+            or last_chapter_available
         )
         redis.hset(serie.store_key, "last-chapter", last_chapter_available)
 
@@ -105,7 +108,9 @@ async def _main():
                     result = await check_new_chapter_task(browser, serie)
 
                     if not result.new_chapter_available:
-                        logger.info(f"[ {serie.title} ] No New Chapter Available.")
+                        logger.info(
+                            f"[ {serie.title} ] No New Chapter Available."
+                        )
                         continue
 
                     send_discord_new_chapter_notification(result)
