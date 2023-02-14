@@ -5,6 +5,6 @@ WORKDIR /app
 RUN pip install playwright \
     && playwright install-deps firefox \
     && playwright install firefox
-COPY series.toml dist/manhuaplus_scraping*.tar.gz .
+COPY manhuaplus-series.toml dist/manhuaplus_scraping*.tar.gz .
 RUN pip install manhuaplus_scraping*.tar.gz
 CMD ["python", "-m", "manhuaplus_scraping"]

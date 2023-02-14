@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 from dataclasses import dataclass, field
+from itertools import cycle
 
 import requests
 import toml
@@ -14,7 +15,6 @@ WEBHOOK_URL = (
 )
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
-CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", 120))
 logger = logging.getLogger("manhuaplus-scraping")
 logger.addHandler(sh := logging.StreamHandler())
 sh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
@@ -28,6 +28,7 @@ class Serie:
     url: str
     store_key: str
     discord_wh: str
+    check_interval: int
 
 
 @dataclass
@@ -49,8 +50,8 @@ def main():
 
 def send_discord_new_chapter_notification(task_result: ScrapingTaskResult):
     message = (
-        f"[ {task_result.serie.title}] "
-        "New Chapter Available: {task_result.last_chapter_saved} => {task_result.new_chapter_available}\n"
+        f"[ {task_result.serie.title} ] "
+        "New Chapter Available {task_result.last_chapter_saved} => {task_result.new_chapter_available}\n"
         f"{task_result.new_chapter_url}"
     )
 
@@ -62,56 +63,64 @@ def send_discord_new_chapter_notification(task_result: ScrapingTaskResult):
         pass
 
 
-async def worker(browser: Browser, serie: Serie) -> ScrapingTaskResult:
-    page = await browser.new_page()
-    await page.goto(serie.url, wait_until="domcontentloaded")
-    element = page.locator(".wp-manga-chapter:nth-child(1) a")
-    _, value, *_ = (await element.text_content()).split()
-    last_chapter_available = int(value)
-    last_chapter_available_link = await element.get_attribute("href")
-    last_chapter_saved = int(
-        redis.hget(serie.store_key, "last-chapter") or last_chapter_available
-    )
-    redis.hset(serie.store_key, "last-chapter", last_chapter_available)
+async def check_new_chapter_task(browser: Browser, serie: Serie) -> ScrapingTaskResult:
+    try:
+        page = await browser.new_page()
+        await page.goto(serie.url, wait_until="domcontentloaded")
+        element = page.locator(".wp-manga-chapter:nth-child(1) a")
+        _, value, *_ = (await element.text_content()).split()
+        last_chapter_available = int(value)
+        last_chapter_available_link = await element.get_attribute("href")
+        last_chapter_saved = int(
+            redis.hget(serie.store_key, "last-chapter") or last_chapter_available
+        )
+        redis.hset(serie.store_key, "last-chapter", last_chapter_available)
 
-    if last_chapter_available <= last_chapter_saved:
-        return ScrapingTaskResult(serie, last_chapter_saved, False)
+        if last_chapter_available <= last_chapter_saved:
+            return ScrapingTaskResult(serie, last_chapter_saved, False)
 
-    return ScrapingTaskResult(
-        serie,
-        last_chapter_saved,
-        True,
-        last_chapter_available,
-        last_chapter_available_link,
-    )
+        return ScrapingTaskResult(
+            serie,
+            last_chapter_saved,
+            True,
+            last_chapter_available,
+            last_chapter_available_link,
+        )
+    finally:
+        await page.close()
 
 
 async def _main():
-    with open("series.toml", mode="r") as file:
+    with open("manhuaplus-series.toml", mode="r") as file:
         content = toml.load(file)
 
     series = [Serie(**item) for item in content["series"]]
 
-    while True:
-        async with async_playwright() as p:
-            browser = await p.firefox.launch()
-            tasks = [worker(browser, serie) for serie in series]
+    async with async_playwright() as p:
+        browser = await p.firefox.launch()
 
-            try:
-                results: list[ScrapingTaskResult] = await asyncio.gather(*tasks)
+        async def worker(serie: Serie):
+            while True:
+                try:
+                    result = await check_new_chapter_task(browser, serie)
 
-                for result in results:
                     if not result.new_chapter_available:
-                        logger.info(f"{result.serie.title}: No New Chapter Available.")
+                        logger.info(f"[ {serie.title} ] No New Chapter Available.")
                         continue
 
                     send_discord_new_chapter_notification(result)
+                finally:
+                    await asyncio.sleep(serie.check_interval)
 
-            except Exception as error:
-                logger.error("An error ocurred: %s", str(error))
-            finally:
-                await browser.close()
-                await asyncio.sleep(CHECK_INTERVAL)
+        job = asyncio.gather(*[worker(serie) for serie in series])
+
+        try:
+            await job
+        except Exception as error:
+            logger.error("An error ocurred: %s", str(error))
+            job.cancel(str(error))
+        finally:
+            await browser.close()
 
 
 if __name__ == "__main__":
