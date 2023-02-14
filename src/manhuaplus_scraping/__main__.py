@@ -39,14 +39,6 @@ class ScrapingTaskResult:
     new_chapter_url: str | None = field(default=None)
 
 
-def main():
-    try:
-        redis.ping()
-        asyncio.run(_main())
-    except Exception as error:
-        logger.error(str(error))
-
-
 def send_discord_new_chapter_notification(task_result: ScrapingTaskResult):
     message = (
         f"[ {task_result.serie.title} ] "
@@ -126,6 +118,14 @@ async def _main():
             job.cancel(str(error))
         finally:
             await browser.close()
+
+
+def main():
+    try:
+        redis.ping()
+        asyncio.run(_main())
+    except Exception as error:
+        logger.error(str(error))
 
 
 if __name__ == "__main__":
