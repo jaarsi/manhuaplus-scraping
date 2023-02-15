@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import signal
 from dataclasses import dataclass, field
 
 import requests
@@ -111,11 +112,21 @@ async def _main():
 
         job = asyncio.gather(*[worker(serie) for serie in series])
 
+        def handle_shutdown(*args):
+            logger.warning("SIGTERM received. Aborting Jobs.")
+            job.cancel()
+
+        asyncio.get_event_loop().add_signal_handler(
+            signal.SIGTERM, handle_shutdown
+        )
+
         try:
             await job
         except Exception as error:
             logger.error("An error ocurred: %s", str(error))
             job.cancel(str(error))
+        except asyncio.CancelledError:
+            pass
         finally:
             await browser.close()
 
