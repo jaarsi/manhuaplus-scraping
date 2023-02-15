@@ -34,8 +34,8 @@ class Serie:
 class ScrapingTaskResult:
     serie: Serie
     last_chapter_saved: int
-    new_chapter_available: bool
-    new_chapter: int | None = field(default=None)
+    is_new_chapter_available: bool
+    new_chapter_number: int | None = field(default=None)
     new_chapter_url: str | None = field(default=None)
 
 
@@ -43,7 +43,7 @@ def send_discord_new_chapter_notification(task_result: ScrapingTaskResult):
     message = (
         f"[ {task_result.serie.title} ] "
         f"New Chapter Available {task_result.last_chapter_saved} => "
-        f"{task_result.new_chapter_available}\n"
+        f"{task_result.new_chapter_number}\n"
         f"{task_result.new_chapter_url}"
     )
 
@@ -99,7 +99,7 @@ async def _main():
                 try:
                     result = await check_new_chapter_task(browser, serie)
 
-                    if not result.new_chapter_available:
+                    if not result.is_new_chapter_available:
                         logger.info(
                             f"[ {serie.title} ] No New Chapter Available."
                         )
