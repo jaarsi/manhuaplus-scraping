@@ -105,6 +105,12 @@ async def _main():
                         continue
 
                     send_discord_new_chapter_notification(result)
+                except Exception as error:
+                    logger.error(
+                        "[ %s ] An error has ocurred => %s",
+                        serie.title,
+                        str(error),
+                    )
                 finally:
                     await asyncio.sleep(serie.check_interval)
 
