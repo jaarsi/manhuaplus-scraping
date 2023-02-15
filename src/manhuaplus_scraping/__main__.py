@@ -9,10 +9,6 @@ import toml
 from playwright.async_api import Browser, async_playwright
 from redis import Redis
 
-WEBHOOK_URL = (
-    "https://discord.com/api/webhooks/1046665729166020648/"
-    "BhO1w3r65bDEol449m9H39qrEbfOacFSq6jCR4RawMUviIozGqq3CNNDn5c5g3PvBDGV"
-)
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 logger = logging.getLogger("manhuaplus-scraping")
