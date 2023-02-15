@@ -17,7 +17,9 @@ REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 logger = logging.getLogger("manhuaplus-scraping")
 logger.addHandler(sh := logging.StreamHandler())
-sh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+sh.setFormatter(
+    logging.Formatter("[ %(asctime)s ] [ %(levelname)s ] %(message)s")
+)
 logger.setLevel(logging.INFO)
 redis: Redis = Redis(REDIS_HOST, REDIS_PORT, 0)
 
@@ -42,7 +44,7 @@ class ScrapingTaskResult:
 
 def send_discord_new_chapter_notification(task_result: ScrapingTaskResult):
     message = (
-        f"[ {task_result.serie.title} ] "
+        f"[ {task_result.serie.title} ]"
         f"New Chapter Available {task_result.last_chapter_saved} => "
         f"{task_result.new_chapter_number}\n"
         f"{task_result.new_chapter_url}"
@@ -123,10 +125,10 @@ async def _main():
         try:
             await job
         except Exception as error:
-            logger.error("An error ocurred: %s", str(error))
+            logger.error("An error has ocurred => %s", str(error))
             job.cancel(str(error))
         except asyncio.CancelledError:
-            pass
+            logger.warning("Scraping job was cancelled.")
         finally:
             await browser.close()
 
