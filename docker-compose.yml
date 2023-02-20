@@ -1,6 +1,10 @@
 services:
     redis:
         image: redis
+        deploy:
+            resources:
+                limits:
+                    memory: 50M
     app:
         build: .
         environment:
@@ -8,3 +12,8 @@ services:
             - REDIS_PORT=6379
         depends_on:
             - redis
+        deploy:
+            resources:
+                limits:
+                    # cpus: '0.50'
+                    memory: 800M

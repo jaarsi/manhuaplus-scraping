@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 import requests
 import toml
-from playwright.async_api import Browser, async_playwright
+from playwright.async_api import BrowserContext, TimeoutError, async_playwright
 from redis import Redis
 
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
@@ -40,7 +40,7 @@ class ScrapingTaskResult:
 
 def send_discord_new_chapter_notification(task_result: ScrapingTaskResult):
     message = (
-        f"[ {task_result.serie.title} ]"
+        f"[ {task_result.serie.title} ] "
         f"New Chapter Available {task_result.last_chapter_saved} => "
         f"{task_result.new_chapter_number}\n"
         f"{task_result.new_chapter_url}"
@@ -55,10 +55,10 @@ def send_discord_new_chapter_notification(task_result: ScrapingTaskResult):
 
 
 async def check_new_chapter_task(
-    browser: Browser, serie: Serie
+    context: BrowserContext, serie: Serie
 ) -> ScrapingTaskResult:
     try:
-        page = await browser.new_page()
+        page = await context.new_page()
         await page.goto(serie.url, wait_until="domcontentloaded")
         element = page.locator(".wp-manga-chapter:nth-child(1) a")
         _, value, *_ = (await element.text_content()).split()
@@ -81,7 +81,7 @@ async def check_new_chapter_task(
             last_chapter_available_link,
         )
     finally:
-        await page.close()
+        await context.close()
 
 
 async def _main():
@@ -91,12 +91,14 @@ async def _main():
     series = [Serie(**item) for item in content["series"]]
 
     async with async_playwright() as p:
-        browser = await p.firefox.launch()
+        browser = await p.firefox.launch(headless=True)
 
         async def worker(serie: Serie):
             while True:
                 try:
-                    result = await check_new_chapter_task(browser, serie)
+                    result = await check_new_chapter_task(
+                        await browser.new_context(), serie
+                    )
 
                     if not result.is_new_chapter_available:
                         logger.info(
@@ -105,12 +107,8 @@ async def _main():
                         continue
 
                     send_discord_new_chapter_notification(result)
-                except Exception as error:
-                    logger.error(
-                        "[ %s ] An error has ocurred => %s",
-                        serie.title,
-                        str(error),
-                    )
+                except TimeoutError as error:
+                    logger.warning(f"[ {serie.title} ] {error.message}")
                 finally:
                     await asyncio.sleep(serie.check_interval)
 
