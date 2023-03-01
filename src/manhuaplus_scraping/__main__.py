@@ -11,6 +11,7 @@ from redis import Redis
 
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+DISCORD_WH = os.getenv("DISCORD_WH", None)
 logger = logging.getLogger("manhuaplus-scraping")
 logger.addHandler(sh := logging.StreamHandler())
 sh.setFormatter(
@@ -25,7 +26,6 @@ class Serie:
     title: str
     url: str
     store_key: str
-    discord_wh: str
     check_interval: int
 
 
@@ -39,6 +39,9 @@ class ScrapingTaskResult:
 
 
 def send_discord_new_chapter_notification(task_result: ScrapingTaskResult):
+    if DISCORD_WH is None:
+        return
+
     message = (
         f"[ {task_result.serie.title} ] "
         f"New Chapter Available {task_result.last_chapter_saved} => "
@@ -47,9 +50,7 @@ def send_discord_new_chapter_notification(task_result: ScrapingTaskResult):
     )
 
     try:
-        requests.post(
-            task_result.serie.discord_wh, json={"content": message, "flags": 4}
-        )
+        requests.post(DISCORD_WH, json={"content": message, "flags": 4})
     except Exception:
         pass
 
