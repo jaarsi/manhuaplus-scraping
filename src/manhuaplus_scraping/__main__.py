@@ -45,21 +45,24 @@ class ScrapingTaskResult:
     new_chapter_url: str | None = field(default=None)
 
 
-def send_discord_new_chapter_notification(task_result: ScrapingTaskResult):
+def send_discord_notification(message: str):
     if DISCORD_WH is None:
         return
 
+    try:
+        requests.post(DISCORD_WH, json={"content": message, "flags": 4})
+    except Exception:
+        pass
+
+
+def send_discord_new_chapter_notification(task_result: ScrapingTaskResult):
     message = (
         f"[ {task_result.serie.title} ] "
         f"New Chapter Available {task_result.last_chapter_saved} => "
         f"{task_result.new_chapter_number}\n"
         f"{task_result.new_chapter_url}"
     )
-
-    try:
-        requests.post(DISCORD_WH, json={"content": message, "flags": 4})
-    except Exception:
-        pass
+    send_discord_notification(message)
 
 
 async def check_new_chapter_task(
