@@ -118,25 +118,25 @@ def get_next_checking(serie: Serie) -> datetime:
 
 async def worker(browser: BrowserType, serie: Serie):
     async def _worker():
+        next_checking_at = get_next_checking(serie)
+        _msg = f"[ {serie.title} ] Next checking at {next_checking_at.isoformat()}."
+        send_discord_notification(_msg)
+        logger.info(_msg)
+        wait_seconds_interval = (next_checking_at - datetime.now()).seconds
+        await asyncio.sleep(wait_seconds_interval)
+
         try:
             result = await check_new_chapter_task(
                 await browser.new_context(), serie
             )
-
+        except TimeoutError as error:
+            logger.warning(f"[ {serie.title} ] {error.message}")
+        else:
             if not result.is_new_chapter_available:
                 logger.info(f"[ {serie.title} ] No New Chapter Available.")
                 return
 
             send_discord_new_chapter_notification(result)
-        except TimeoutError as error:
-            logger.warning(f"[ {serie.title} ] {error.message}")
-        finally:
-            next_checking_at = get_next_checking(serie)
-            logger.info(
-                f"[ {serie.title} ] Next checking at {next_checking_at.isoformat()}."
-            )
-            wait_seconds_interval = (next_checking_at - datetime.now()).seconds
-            await asyncio.sleep(wait_seconds_interval)
 
     while True:
         await _worker()
