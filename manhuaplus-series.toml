@@ -2,16 +2,16 @@
 title = "Martial Peak"
 url = "https://manhuaplus.com/manga/martial-peak/"
 store_key = "martial-peak"
-check_interval = 7200
+check_intervals = [2,10,16,20]
 
 [[series]]
 title = "Magic Demon Emperor"
 url = "https://manhuaplus.com/manga/demon-magic-emperor/"
 store_key = "magic-demon-emperor"
-check_interval = 43200 # 12 hours
+check_intervals = [12,]
 
 [[series]]
 title = "Heavens Devourer"
 url = "https://manhuaplus.com/manga/heavens-devourer/"
 store_key = "heavens-devourer"
-check_interval = 43200
+check_intervals = [12,]

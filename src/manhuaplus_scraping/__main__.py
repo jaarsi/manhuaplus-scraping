@@ -3,15 +3,22 @@ import logging
 import os
 import signal
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 
 import requests
 import toml
-from playwright.async_api import BrowserContext, TimeoutError, async_playwright
+from playwright.async_api import (
+    BrowserContext,
+    BrowserType,
+    TimeoutError,
+    async_playwright,
+)
 from redis import Redis
 
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 DISCORD_WH = os.getenv("DISCORD_WH", None)
+
 logger = logging.getLogger("manhuaplus-scraping")
 logger.addHandler(sh := logging.StreamHandler())
 sh.setFormatter(
@@ -26,7 +33,7 @@ class Serie:
     title: str
     url: str
     store_key: str
-    check_interval: int
+    check_intervals: list[int]
 
 
 @dataclass
@@ -85,7 +92,56 @@ async def check_new_chapter_task(
         await context.close()
 
 
+def get_next_checking(serie: Serie) -> datetime:
+    now = datetime.now()
+
+    try:
+        next_interval_hour = [
+            x for x in serie.check_intervals if x > now.hour
+        ][0]
+    except IndexError:
+        next_interval_hour = serie.check_intervals[0]
+
+    if next_interval_hour > now.hour:
+        hours_interval = next_interval_hour - now.hour
+    else:
+        hours_interval = 24 - (now.hour - next_interval_hour)
+
+    next_interval = (now + timedelta(hours=hours_interval)).replace(
+        minute=0, second=0, microsecond=0
+    )
+    return next_interval
+
+
+async def worker(browser: BrowserType, serie: Serie):
+    async def _worker():
+        try:
+            result = await check_new_chapter_task(
+                await browser.new_context(), serie
+            )
+
+            if not result.is_new_chapter_available:
+                logger.info(f"[ {serie.title} ] No New Chapter Available.")
+                return
+
+            send_discord_new_chapter_notification(result)
+        except TimeoutError as error:
+            logger.warning(f"[ {serie.title} ] {error.message}")
+        finally:
+            next_checking_at = get_next_checking(serie)
+            logger.info(
+                f"[ {serie.title} ] Next checking at {next_checking_at.isoformat()}."
+            )
+            wait_seconds_interval = (next_checking_at - datetime.now()).seconds
+            await asyncio.sleep(wait_seconds_interval)
+
+    while True:
+        await _worker()
+
+
 async def _main():
+    redis.ping()
+
     with open("manhuaplus-series.toml", mode="r") as file:
         content = toml.load(file)
 
@@ -93,52 +149,32 @@ async def _main():
 
     async with async_playwright() as p:
         browser = await p.firefox.launch(headless=True)
+        job = asyncio.gather(*[worker(browser, serie) for serie in series])
 
-        async def worker(serie: Serie):
-            while True:
-                try:
-                    result = await check_new_chapter_task(
-                        await browser.new_context(), serie
-                    )
-
-                    if not result.is_new_chapter_available:
-                        logger.info(
-                            f"[ {serie.title} ] No New Chapter Available."
-                        )
-                        continue
-
-                    send_discord_new_chapter_notification(result)
-                except TimeoutError as error:
-                    logger.warning(f"[ {serie.title} ] {error.message}")
-                finally:
-                    await asyncio.sleep(serie.check_interval)
-
-        job = asyncio.gather(*[worker(serie) for serie in series])
-
-        def handle_shutdown(*args):
+        def handle_shutdown_signal(*args):
             logger.warning("SIGTERM received. Aborting Jobs.")
             job.cancel()
 
         asyncio.get_event_loop().add_signal_handler(
-            signal.SIGTERM, handle_shutdown
+            signal.SIGTERM, handle_shutdown_signal
         )
 
         try:
             await job
         except Exception as error:
-            logger.error("An error has ocurred => %s", str(error))
             job.cancel(str(error))
-        except asyncio.CancelledError:
-            logger.warning("Scraping job was cancelled.")
+            raise
         finally:
             await browser.close()
 
 
 def main():
     try:
-        redis.ping()
         asyncio.run(_main())
+    except asyncio.CancelledError:
+        logger.warning("Scraping job was cancelled.")
     except Exception as error:
+        logger.error("An error has ocurred => %s", str(error))
         logger.error(str(error))
 
 

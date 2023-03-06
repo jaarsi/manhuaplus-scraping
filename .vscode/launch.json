@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Module",
+            "name": "manhuaplus_scraping",
             "type": "python",
             "request": "launch",
             "module": "manhuaplus_scraping",
