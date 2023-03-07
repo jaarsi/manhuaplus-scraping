@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "manhuaplus-scraping"
 version = "0.1.0"
-description = ""
-authors = ["Your Name <you@example.com>"]
+description = "Manhuaplus scraping service"
+authors = ["Jairo <jairo.araujo.silva@gmail.com>"]
 packages = [{ include = "manhuaplus_scraping", from = "src" }]
 
 [tool.poetry.dependencies]

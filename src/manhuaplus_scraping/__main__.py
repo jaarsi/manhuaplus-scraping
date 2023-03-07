@@ -8,8 +8,8 @@ from datetime import datetime, timedelta
 import requests
 import toml
 from playwright.async_api import (
+    Browser,
     BrowserContext,
-    BrowserType,
     TimeoutError,
     async_playwright,
 )
@@ -19,12 +19,40 @@ REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 DISCORD_WH = os.getenv("DISCORD_WH", None)
 
-logger = logging.getLogger("manhuaplus-scraping")
-logger.addHandler(sh := logging.StreamHandler())
-sh.setFormatter(
-    logging.Formatter("[ %(asctime)s ] [ %(levelname)s ] %(message)s")
-)
-logger.setLevel(logging.INFO)
+
+class DiscordLoggingHandler(logging.Handler):
+    def _send_discord_notification(self, message: str):
+        if not (DISCORD_WH and message):
+            return
+
+        try:
+            requests.post(DISCORD_WH, json={"content": message, "flags": 4})
+        except Exception:
+            pass
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if not record.msg:
+            return
+
+        message = f"```{self.format(record)}```"
+        self._send_discord_notification(message)
+
+
+def get_logger(name: str) -> logging.Logger:
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler := logging.StreamHandler())
+    handler.setFormatter(
+        logging.Formatter("[ %(asctime)s ] [ %(levelname)s ] %(message)s")
+    )
+    logger.addHandler(handler := DiscordLoggingHandler())
+    handler.setFormatter(
+        logging.Formatter("[ %(asctime)s ] [ %(levelname)s ]\n%(message)s")
+    )
+    return logger
+
+
+logger = get_logger("manhuaplus-scraping")
 redis: Redis = Redis(REDIS_HOST, REDIS_PORT, 0)
 
 
@@ -45,31 +73,12 @@ class ScrapingTaskResult:
     new_chapter_url: str | None = field(default=None)
 
 
-def send_discord_notification(message: str):
-    if DISCORD_WH is None:
-        return
-
-    try:
-        requests.post(DISCORD_WH, json={"content": message, "flags": 4})
-    except Exception:
-        pass
-
-
-def send_discord_new_chapter_notification(task_result: ScrapingTaskResult):
-    message = (
-        f"[ {task_result.serie.title} ] "
-        f"New Chapter Available {task_result.last_chapter_saved} => "
-        f"{task_result.new_chapter_number}\n"
-        f"{task_result.new_chapter_url}"
-    )
-    send_discord_notification(message)
-
-
 async def check_new_chapter_task(
     context: BrowserContext, serie: Serie
 ) -> ScrapingTaskResult:
     try:
         page = await context.new_page()
+        page.set_default_timeout(5000)
         await page.goto(serie.url, wait_until="domcontentloaded")
         element = page.locator(".wp-manga-chapter:nth-child(1) a")
         _, value, *_ = (await element.text_content()).split()
@@ -116,12 +125,12 @@ def get_next_checking(serie: Serie) -> datetime:
     return next_interval
 
 
-async def worker(browser: BrowserType, serie: Serie):
+async def worker(browser: Browser, serie: Serie):
     async def _worker():
         next_checking_at = get_next_checking(serie)
-        _msg = f"[ {serie.title} ] Next checking at {next_checking_at.isoformat()}."
-        send_discord_notification(_msg)
-        logger.info(_msg)
+        logger.info(
+            f"[ {serie.title} ] Next checking at {next_checking_at.isoformat()}."
+        )
         wait_seconds_interval = (next_checking_at - datetime.now()).seconds
         await asyncio.sleep(wait_seconds_interval)
 
@@ -136,13 +145,19 @@ async def worker(browser: BrowserType, serie: Serie):
                 logger.info(f"[ {serie.title} ] No New Chapter Available.")
                 return
 
-            send_discord_new_chapter_notification(result)
+            logger.info(
+                f"[ {result.serie.title} ] "
+                f"New Chapter Available {result.last_chapter_saved} => "
+                f"{result.new_chapter_number}\n"
+                f"{result.new_chapter_url}"
+            )
 
     while True:
         await _worker()
 
 
 async def _main():
+    logger.info("Starting Manhuaplus scraping service.")
     redis.ping()
 
     with open("manhuaplus-series.toml", mode="r") as file:
@@ -153,20 +168,16 @@ async def _main():
     async with async_playwright() as p:
         browser = await p.firefox.launch(headless=True)
         job = asyncio.gather(*[worker(browser, serie) for serie in series])
-
-        def handle_shutdown_signal(*args):
-            logger.warning("SIGTERM received. Aborting Jobs.")
-            job.cancel()
-
         asyncio.get_event_loop().add_signal_handler(
-            signal.SIGTERM, handle_shutdown_signal
+            signal.SIGTERM, lambda *args: job.cancel()
         )
 
         try:
             await job
+        except asyncio.CancelledError:
+            logger.warning("Cancel scraping order received.")
         except Exception as error:
             job.cancel(str(error))
-            raise
         finally:
             await browser.close()
 
@@ -174,10 +185,10 @@ async def _main():
 def main():
     try:
         asyncio.run(_main())
-    except asyncio.CancelledError:
-        logger.warning("Scraping job was cancelled.")
     except Exception as error:
-        logger.error("An error has ocurred => %s", str(error))
+        logger.error("Unexpected error ocurred => %s", str(error))
+    finally:
+        logger.info("Manhuaplus scraping service is down.")
 
 
 if __name__ == "__main__":
