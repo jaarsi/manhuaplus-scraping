@@ -157,7 +157,6 @@ async def worker(browser: Browser, serie: Serie):
 
 
 async def _main():
-    logger.info("Starting Manhuaplus scraping service.")
     redis.ping()
 
     with open("manhuaplus-series.toml", mode="r") as file:
@@ -183,12 +182,14 @@ async def _main():
 
 
 def main():
+    logger.info("Starting Manhuaplus scraping service.")
+
     try:
         asyncio.run(_main())
     except Exception as error:
         logger.error("Unexpected error ocurred => %s", str(error))
-    finally:
-        logger.info("Manhuaplus scraping service is down.")
+
+    logger.info("Manhuaplus scraping service is down.")
 
 
 if __name__ == "__main__":

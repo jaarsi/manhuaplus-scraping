@@ -1,4 +1,4 @@
 #!/bin/bash
-rm dist/* \
+rm -f dist/* \
     && poetry build \
     && docker compose up --build -d
