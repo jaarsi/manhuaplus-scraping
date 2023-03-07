@@ -178,7 +178,6 @@ def main():
         logger.warning("Scraping job was cancelled.")
     except Exception as error:
         logger.error("An error has ocurred => %s", str(error))
-        logger.error(str(error))
 
 
 if __name__ == "__main__":
