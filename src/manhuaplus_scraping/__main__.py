@@ -1,11 +1,9 @@
 import asyncio
-import logging
 import os
 import signal
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-import requests
 import toml
 from playwright.async_api import (
     Browser,
@@ -15,50 +13,11 @@ from playwright.async_api import (
 )
 from redis import Redis
 
+from ._logging import get_logger
+
+logger = get_logger("manhuaplus-scraping")
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
-DISCORD_WH = os.getenv("DISCORD_WH", None)
-
-
-class DiscordLoggingHandler(logging.Handler):
-    def _send_discord_notification(self, message: str):
-        if not (DISCORD_WH and message):
-            return
-
-        try:
-            requests.post(DISCORD_WH, json={"content": message, "flags": 4})
-        except Exception:
-            pass
-
-    def emit(self, record: logging.LogRecord) -> None:
-        if not record.msg:
-            return
-
-        self._send_discord_notification(self.format(record))
-
-
-def setup_logging():
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    _stream_handler = logging.StreamHandler()
-    _stream_handler.setFormatter(
-        logging.Formatter(
-            "[ %(asctime)s ] [ %(levelname)s ] [ %(author)s ] %(message)s",
-            defaults={"author": "System"},
-        )
-    )
-    logger.addHandler(_stream_handler)
-    _discord_handler = DiscordLoggingHandler()
-    _discord_handler.setFormatter(
-        logging.Formatter(
-            ">>> **[ %(asctime)s ]\n[ %(levelname)s ]\n[ %(author)s ]**\n%(message)s",
-            defaults={"author": "System"},
-        )
-    )
-    logger.addHandler(_discord_handler)
-
-
-setup_logging()
 redis: Redis = Redis(REDIS_HOST, REDIS_PORT, 0)
 
 
@@ -134,7 +93,7 @@ def get_next_checking(serie: Serie) -> datetime:
 async def worker(browser: Browser, serie: Serie):
     async def _worker():
         next_checking_at = get_next_checking(serie)
-        logging.info(
+        logger.info(
             f"Next checking at {next_checking_at.isoformat()}.",
             extra={"author": serie.title},
         )
@@ -146,15 +105,15 @@ async def worker(browser: Browser, serie: Serie):
                 await browser.new_context(), serie
             )
         except TimeoutError as error:
-            logging.warning(f"{error.message}", extra={"author": serie.title})
+            logger.warning(f"{error.message}", extra={"author": serie.title})
         else:
             if not result.is_new_chapter_available:
-                logging.info(
+                logger.info(
                     "No New Chapter Available.", extra={"author": serie.title}
                 )
                 return
 
-            logging.info(
+            logger.info(
                 f"New Chapter Available {result.last_chapter_saved} => "
                 f"{result.new_chapter_number}\n"
                 f"{result.new_chapter_url}",
@@ -183,7 +142,7 @@ async def _main():
         try:
             await job
         except asyncio.CancelledError:
-            logging.warning("Cancel scraping order received.")
+            logger.warning("Cancel scraping order received.")
         except Exception as error:
             job.cancel(str(error))
         finally:
@@ -191,14 +150,14 @@ async def _main():
 
 
 def main():
-    logging.info("Starting Manhuaplus scraping service.")
+    logger.info("Starting Manhuaplus scraping service.")
 
     try:
         asyncio.run(_main())
     except Exception as error:
-        logging.error("Unexpected error ocurred => %s", str(error))
+        logger.error("Unexpected error ocurred => %s", str(error))
 
-    logging.info("Manhuaplus scraping service is down.")
+    logger.info("Manhuaplus scraping service is down.")
 
 
 if __name__ == "__main__":
