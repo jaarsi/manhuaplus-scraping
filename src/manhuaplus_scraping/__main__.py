@@ -38,11 +38,21 @@ class DiscordLoggingHandler(logging.Handler):
         self._send_discord_notification(message)
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="[ %(asctime)s ] [ %(levelname)s ] %(message)s",
-    handlers=[logging.StreamHandler(), DiscordLoggingHandler()],
-)
+def setup_logging():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="[ %(asctime)s ] [ %(levelname)s ] %(message)s",
+        handlers=[
+            logging.StreamHandler(),
+            _discord_handler := DiscordLoggingHandler(),
+        ],
+    )
+    _discord_handler.setFormatter(
+        logging.Formatter("[ %(asctime)s ] [ %(levelname)s ]\n%(message)s")
+    )
+
+
+setup_logging()
 redis: Redis = Redis(REDIS_HOST, REDIS_PORT, 0)
 
 
