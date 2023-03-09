@@ -34,22 +34,28 @@ class DiscordLoggingHandler(logging.Handler):
         if not record.msg:
             return
 
-        message = f"```{self.format(record)}```"
-        self._send_discord_notification(message)
+        self._send_discord_notification(self.format(record))
 
 
 def setup_logging():
-    logging.basicConfig(
-        level=logging.INFO,
-        format="[ %(asctime)s ] [ %(levelname)s ] %(message)s",
-        handlers=[
-            logging.StreamHandler(),
-            _discord_handler := DiscordLoggingHandler(),
-        ],
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    _stream_handler = logging.StreamHandler()
+    _stream_handler.setFormatter(
+        logging.Formatter(
+            "[ %(asctime)s ] [ %(levelname)s ] [ %(author)s ] %(message)s",
+            defaults={"author": "System"},
+        )
     )
+    logger.addHandler(_stream_handler)
+    _discord_handler = DiscordLoggingHandler()
     _discord_handler.setFormatter(
-        logging.Formatter("[ %(asctime)s ] [ %(levelname)s ]\n%(message)s")
+        logging.Formatter(
+            ">>> **[ %(asctime)s ]\n[ %(levelname)s ]\n[ %(author)s ]**\n%(message)s",
+            defaults={"author": "System"},
+        )
     )
+    logger.addHandler(_discord_handler)
 
 
 setup_logging()
@@ -129,7 +135,8 @@ async def worker(browser: Browser, serie: Serie):
     async def _worker():
         next_checking_at = get_next_checking(serie)
         logging.info(
-            f"[ {serie.title} ] Next checking at {next_checking_at.isoformat()}."
+            f"Next checking at {next_checking_at.isoformat()}.",
+            extra={"author": serie.title},
         )
         wait_seconds_interval = (next_checking_at - datetime.now()).seconds
         await asyncio.sleep(wait_seconds_interval)
@@ -139,17 +146,19 @@ async def worker(browser: Browser, serie: Serie):
                 await browser.new_context(), serie
             )
         except TimeoutError as error:
-            logging.warning(f"[ {serie.title} ] {error.message}")
+            logging.warning(f"{error.message}", extra={"author": serie.title})
         else:
             if not result.is_new_chapter_available:
-                logging.info(f"[ {serie.title} ] No New Chapter Available.")
+                logging.info(
+                    "No New Chapter Available.", extra={"author": serie.title}
+                )
                 return
 
             logging.info(
-                f"[ {result.serie.title} ] "
                 f"New Chapter Available {result.last_chapter_saved} => "
                 f"{result.new_chapter_number}\n"
-                f"{result.new_chapter_url}"
+                f"{result.new_chapter_url}",
+                extra={"author": serie.title},
             )
 
     while True:
