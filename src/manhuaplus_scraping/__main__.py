@@ -38,21 +38,11 @@ class DiscordLoggingHandler(logging.Handler):
         self._send_discord_notification(message)
 
 
-def get_logger(name: str) -> logging.Logger:
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
-    logger.addHandler(handler := logging.StreamHandler())
-    handler.setFormatter(
-        logging.Formatter("[ %(asctime)s ] [ %(levelname)s ] %(message)s")
-    )
-    logger.addHandler(handler := DiscordLoggingHandler())
-    handler.setFormatter(
-        logging.Formatter("[ %(asctime)s ] [ %(levelname)s ]\n%(message)s")
-    )
-    return logger
-
-
-logger = get_logger("manhuaplus-scraping")
+logging.basicConfig(
+    level=logging.INFO,
+    format="[ %(asctime)s ] [ %(levelname)s ] %(message)s",
+    handlers=[logging.StreamHandler(), DiscordLoggingHandler()],
+)
 redis: Redis = Redis(REDIS_HOST, REDIS_PORT, 0)
 
 
@@ -128,7 +118,7 @@ def get_next_checking(serie: Serie) -> datetime:
 async def worker(browser: Browser, serie: Serie):
     async def _worker():
         next_checking_at = get_next_checking(serie)
-        logger.info(
+        logging.info(
             f"[ {serie.title} ] Next checking at {next_checking_at.isoformat()}."
         )
         wait_seconds_interval = (next_checking_at - datetime.now()).seconds
@@ -139,13 +129,13 @@ async def worker(browser: Browser, serie: Serie):
                 await browser.new_context(), serie
             )
         except TimeoutError as error:
-            logger.warning(f"[ {serie.title} ] {error.message}")
+            logging.warning(f"[ {serie.title} ] {error.message}")
         else:
             if not result.is_new_chapter_available:
-                logger.info(f"[ {serie.title} ] No New Chapter Available.")
+                logging.info(f"[ {serie.title} ] No New Chapter Available.")
                 return
 
-            logger.info(
+            logging.info(
                 f"[ {result.serie.title} ] "
                 f"New Chapter Available {result.last_chapter_saved} => "
                 f"{result.new_chapter_number}\n"
@@ -174,7 +164,7 @@ async def _main():
         try:
             await job
         except asyncio.CancelledError:
-            logger.warning("Cancel scraping order received.")
+            logging.warning("Cancel scraping order received.")
         except Exception as error:
             job.cancel(str(error))
         finally:
@@ -182,14 +172,14 @@ async def _main():
 
 
 def main():
-    logger.info("Starting Manhuaplus scraping service.")
+    logging.info("Starting Manhuaplus scraping service.")
 
     try:
         asyncio.run(_main())
     except Exception as error:
-        logger.error("Unexpected error ocurred => %s", str(error))
+        logging.error("Unexpected error ocurred => %s", str(error))
 
-    logger.info("Manhuaplus scraping service is down.")
+    logging.info("Manhuaplus scraping service is down.")
 
 
 if __name__ == "__main__":
