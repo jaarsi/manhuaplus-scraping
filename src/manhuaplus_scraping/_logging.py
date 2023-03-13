@@ -29,7 +29,7 @@ def get_logger(name: str = None):
     _stream_handler = logging.StreamHandler()
     _stream_handler.setFormatter(
         logging.Formatter(
-            "[ %(asctime)s ] [ %(levelname)s ] [ %(author)s ] %(message)s",
+            "[ %(asctime)s ] [ %(author)s ] [ %(levelname)s ] %(message)s",
             defaults={"author": "System"},
         )
     )
@@ -37,7 +37,7 @@ def get_logger(name: str = None):
     _discord_handler = DiscordLoggingHandler()
     _discord_handler.setFormatter(
         logging.Formatter(
-            ">>> **[ %(asctime)s ]\n[ %(levelname)s ]\n[ %(author)s ]**\n%(message)s",
+            ">>> **[ %(author)s ] [ %(levelname)s ]** %(message)s",
             defaults={"author": "System"},
         )
     )
