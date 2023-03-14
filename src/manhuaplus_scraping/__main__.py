@@ -15,7 +15,7 @@ from redis import Redis
 
 from ._logging import get_logger
 
-logger = get_logger("manhuaplus-scraping")
+logger = get_logger("manhuaplus_scraping")
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 redis: Redis = Redis(REDIS_HOST, REDIS_PORT, 0)
@@ -43,7 +43,7 @@ async def check_new_chapter_task(
 ) -> ScrapingTaskResult:
     try:
         page = await context.new_page()
-        page.set_default_timeout(5000)
+        # page.set_default_timeout(5000)
         await page.goto(serie.url, wait_until="domcontentloaded")
         element = page.locator(".wp-manga-chapter:nth-child(1) a")
         _, value, *_ = (await element.text_content()).split()

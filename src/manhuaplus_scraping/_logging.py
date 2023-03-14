@@ -1,7 +1,9 @@
 import logging
+import logging.config
 import os
 
 import requests
+import toml
 
 DISCORD_WH = os.getenv("DISCORD_WH", None)
 
@@ -23,23 +25,16 @@ class DiscordLoggingHandler(logging.Handler):
         self._send_discord_notification(self.format(record))
 
 
-def get_logger(name: str = None):
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
-    _stream_handler = logging.StreamHandler()
-    _stream_handler.setFormatter(
-        logging.Formatter(
-            "[ %(asctime)s ] [ %(author)s ] [ %(levelname)s ] %(message)s",
-            defaults={"author": "System"},
-        )
-    )
-    logger.addHandler(_stream_handler)
-    _discord_handler = DiscordLoggingHandler()
-    _discord_handler.setFormatter(
-        logging.Formatter(
-            ">>> **[ %(author)s ] [ %(levelname)s ]** %(message)s",
-            defaults={"author": "System"},
-        )
-    )
-    logger.addHandler(_discord_handler)
-    return logger
+class CustomFormatter(logging.Formatter):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs, defaults={"author": "System"})
+
+
+def get_logger(name: str) -> logging.Logger:
+    path = os.path.join(os.path.dirname(__file__), "_logging.toml")
+
+    with open(path) as file:
+        config = toml.load(file)
+
+    logging.config.dictConfig(config)
+    return logging.getLogger(name)

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "manhuaplus-scraping"
-version = "0.1.0"
+version = "2023.3.13.0"
 description = "Manhuaplus scraping service"
 authors = ["Jairo <jairo.araujo.silva@gmail.com>"]
 packages = [{ include = "manhuaplus_scraping", from = "src" }]
