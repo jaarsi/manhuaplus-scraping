@@ -8,11 +8,11 @@ disable_existing_loggers = false
 [formatters]
 
 [formatters.default]
-"()" = "manhuaplus_scraping._logging.CustomFormatter"
+"()" = "manhuaplus_scraping.CustomFormatter"
 format = '[ %(asctime)s ] [ %(author)s ] [ %(levelname)s ] %(message)s'
 
 [formatters.discord]
-"()" = "manhuaplus_scraping._logging.CustomFormatter"
+"()" = "manhuaplus_scraping.CustomFormatter"
 format = '>>> **[ %(author)s ] [ %(levelname)s ]** %(message)s'
 
 [handlers]
@@ -22,7 +22,7 @@ class = "logging.StreamHandler"
 formatter = "default"
 
 [handlers.discord]
-class = "manhuaplus_scraping._logging.DiscordLoggingHandler"
+class = "manhuaplus_scraping.DiscordLoggingHandler"
 formatter = "discord"
 
 [loggers]
