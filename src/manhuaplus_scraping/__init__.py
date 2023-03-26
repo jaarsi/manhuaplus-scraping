@@ -4,7 +4,6 @@ import logging.config
 import os
 import signal
 from datetime import datetime, timedelta
-from typing import TypedDict
 
 import requests  # type: ignore
 import toml  # type: ignore
@@ -15,6 +14,7 @@ from playwright.async_api import (
     async_playwright,
 )
 from redis import Redis  # type: ignore
+from typing_extensions import NotRequired, TypedDict
 
 
 class DiscordLoggingHandler(logging.Handler):
@@ -63,12 +63,12 @@ class Serie(TypedDict):
     check_intervals: list[int]
 
 
-class ScrapingTaskResult(TypedDict, total=False):
+class ScrapingTaskResult(TypedDict):
     serie: Serie
     last_chapter_saved: int
     is_new_chapter_available: bool
-    new_chapter_number: int | None
-    new_chapter_url: str | None
+    new_chapter_number: NotRequired[int]
+    new_chapter_url: NotRequired[str]
 
 
 async def check_new_chapter_task(
@@ -129,14 +129,6 @@ def get_next_checking(serie: Serie) -> datetime:
 
 async def worker(browser: Browser, serie: Serie):
     async def _worker():
-        next_checking_at = get_next_checking(serie)
-        logger.info(
-            f"Next checking at {next_checking_at.isoformat()}.",
-            extra={"author": serie["title"]},
-        )
-        wait_seconds_interval = (next_checking_at - datetime.now()).seconds
-        await asyncio.sleep(wait_seconds_interval)
-
         try:
             result = await check_new_chapter_task(
                 await browser.new_context(), serie
@@ -145,8 +137,9 @@ async def worker(browser: Browser, serie: Serie):
             logger.warning(
                 f"{error.message}", extra={"author": serie["title"]}
             )
+            raise
         else:
-            if not result["is_new_chapter_available"]:
+            if not result.get("is_new_chapter_available"):
                 logger.info(
                     "No New Chapter Available.",
                     extra={"author": serie["title"]},
@@ -160,8 +153,22 @@ async def worker(browser: Browser, serie: Serie):
                 extra={"author": serie["title"]},
             )
 
+    next_checking_at = get_next_checking(serie)
+
     while True:
-        await _worker()
+        logger.info(
+            f"Next checking at {next_checking_at.isoformat()}.",
+            extra={"author": serie["title"]},
+        )
+        wait_seconds_interval = (next_checking_at - datetime.now()).seconds
+        await asyncio.sleep(wait_seconds_interval)
+
+        try:
+            await _worker()
+        except:
+            next_checking_at = datetime.now() + timedelta(seconds=30)
+        else:
+            next_checking_at = get_next_checking(serie)
 
 
 async def _main():
