@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "manhuaplus-scraping"
-version = "2023.3.13.0"
+version = "2023.3.26.0"
 description = "Manhuaplus scraping service"
 authors = ["Jairo <jairo.araujo.silva@gmail.com>"]
 packages = [{ include = "manhuaplus_scraping", from = "src" }]
@@ -12,9 +12,17 @@ redis = "^4.3.5"
 requests = "^2.28.1"
 toml = "^0.10.2"
 
+[tool.poetry.group.dev]
+optional = true
+
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.0.4"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.mypy]
+mypy_path = "src"
+show_error_codes = true
+pretty = true

@@ -3,18 +3,18 @@ import logging
 import logging.config
 import os
 import signal
-from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from typing import TypedDict
 
-import requests
-import toml
+import requests  # type: ignore
+import toml  # type: ignore
 from playwright.async_api import (
     Browser,
     BrowserContext,
     TimeoutError,
     async_playwright,
 )
-from redis import Redis
+from redis import Redis  # type: ignore
 
 
 class DiscordLoggingHandler(logging.Handler):
@@ -56,21 +56,19 @@ DISCORD_WH = os.getenv("DISCORD_WH", None)
 redis: Redis = Redis(REDIS_HOST, REDIS_PORT, 0)
 
 
-@dataclass
-class Serie:
+class Serie(TypedDict):
     title: str
     url: str
     store_key: str
     check_intervals: list[int]
 
 
-@dataclass
-class ScrapingTaskResult:
+class ScrapingTaskResult(TypedDict, total=False):
     serie: Serie
     last_chapter_saved: int
     is_new_chapter_available: bool
-    new_chapter_number: int | None = field(default=None)
-    new_chapter_url: str | None = field(default=None)
+    new_chapter_number: int | None
+    new_chapter_url: str | None
 
 
 async def check_new_chapter_task(
@@ -79,26 +77,30 @@ async def check_new_chapter_task(
     try:
         page = await context.new_page()
         # page.set_default_timeout(5000)
-        await page.goto(serie.url, wait_until="domcontentloaded")
+        await page.goto(serie["url"], wait_until="domcontentloaded")
         element = page.locator(".wp-manga-chapter:nth-child(1) a")
         _, value, *_ = (await element.text_content()).split()
         last_chapter_available = int(value)
         last_chapter_available_link = await element.get_attribute("href")
         last_chapter_saved = int(
-            redis.hget(serie.store_key, "last-chapter")
+            redis.hget(serie["store_key"], "last-chapter")
             or last_chapter_available
         )
-        redis.hset(serie.store_key, "last-chapter", last_chapter_available)
+        redis.hset(serie["store_key"], "last-chapter", last_chapter_available)
 
         if last_chapter_available <= last_chapter_saved:
-            return ScrapingTaskResult(serie, last_chapter_saved, False)
+            return ScrapingTaskResult(
+                serie=serie,
+                last_chapter_saved=last_chapter_saved,
+                is_new_chapter_available=False,
+            )
 
         return ScrapingTaskResult(
-            serie,
-            last_chapter_saved,
-            True,
-            last_chapter_available,
-            last_chapter_available_link,
+            serie=serie,
+            last_chapter_saved=last_chapter_saved,
+            is_new_chapter_available=True,
+            new_chapter_number=last_chapter_available,
+            new_chapter_url=last_chapter_available_link,
         )
     finally:
         await context.close()
@@ -109,10 +111,10 @@ def get_next_checking(serie: Serie) -> datetime:
 
     try:
         next_interval_hour = [
-            x for x in serie.check_intervals if x > now.hour
+            x for x in serie["check_intervals"] if x > now.hour
         ][0]
     except IndexError:
-        next_interval_hour = serie.check_intervals[0]
+        next_interval_hour = serie["check_intervals"][0]
 
     if next_interval_hour > now.hour:
         hours_interval = next_interval_hour - now.hour
@@ -130,7 +132,7 @@ async def worker(browser: Browser, serie: Serie):
         next_checking_at = get_next_checking(serie)
         logger.info(
             f"Next checking at {next_checking_at.isoformat()}.",
-            extra={"author": serie.title},
+            extra={"author": serie["title"]},
         )
         wait_seconds_interval = (next_checking_at - datetime.now()).seconds
         await asyncio.sleep(wait_seconds_interval)
@@ -140,19 +142,22 @@ async def worker(browser: Browser, serie: Serie):
                 await browser.new_context(), serie
             )
         except TimeoutError as error:
-            logger.warning(f"{error.message}", extra={"author": serie.title})
+            logger.warning(
+                f"{error.message}", extra={"author": serie["title"]}
+            )
         else:
-            if not result.is_new_chapter_available:
+            if not result["is_new_chapter_available"]:
                 logger.info(
-                    "No New Chapter Available.", extra={"author": serie.title}
+                    "No New Chapter Available.",
+                    extra={"author": serie["title"]},
                 )
                 return
 
             logger.info(
-                f"New Chapter Available {result.last_chapter_saved} => "
-                f"{result.new_chapter_number}\n"
-                f"{result.new_chapter_url}",
-                extra={"author": serie.title},
+                f"New Chapter Available {result['last_chapter_saved']} => "
+                f"{result['new_chapter_number']}\n"
+                f"{result['new_chapter_url']}",
+                extra={"author": serie["title"]},
             )
 
     while True:
