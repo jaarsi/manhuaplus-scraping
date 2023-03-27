@@ -17,6 +17,7 @@ optional = true
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.0.4"
+mypy = "^1.1.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

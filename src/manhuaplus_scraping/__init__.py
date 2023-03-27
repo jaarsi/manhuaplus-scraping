@@ -79,7 +79,7 @@ async def check_new_chapter_task(
         # page.set_default_timeout(5000)
         await page.goto(serie["url"], wait_until="domcontentloaded")
         element = page.locator(".wp-manga-chapter:nth-child(1) a")
-        _, value, *_ = (await element.text_content()).split()
+        _, value, *_ = (await element.text_content()).split()  # type: ignore
         last_chapter_available = int(value)
         last_chapter_available_link = await element.get_attribute("href")
         last_chapter_saved = int(
@@ -100,7 +100,7 @@ async def check_new_chapter_task(
             last_chapter_saved=last_chapter_saved,
             is_new_chapter_available=True,
             new_chapter_number=last_chapter_available,
-            new_chapter_url=last_chapter_available_link,
+            new_chapter_url=last_chapter_available_link,  # type: ignore
         )
     finally:
         await context.close()
