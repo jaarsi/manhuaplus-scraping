@@ -17,13 +17,12 @@ optional = true
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.0.4"
-mypy = "^1.1.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.mypy]
-mypy_path = "src"
+ignore_missing_imports = true
 show_error_codes = true
 pretty = true

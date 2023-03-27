@@ -7,12 +7,7 @@ from datetime import datetime, timedelta
 
 import requests  # type: ignore
 import toml  # type: ignore
-from playwright.async_api import (
-    Browser,
-    BrowserContext,
-    TimeoutError,
-    async_playwright,
-)
+from playwright.async_api import Browser, BrowserContext, TimeoutError, async_playwright
 from redis import Redis  # type: ignore
 from typing_extensions import NotRequired, TypedDict
 
@@ -83,8 +78,7 @@ async def check_new_chapter_task(
         last_chapter_available = int(value)
         last_chapter_available_link = await element.get_attribute("href")
         last_chapter_saved = int(
-            redis.hget(serie["store_key"], "last-chapter")
-            or last_chapter_available
+            redis.hget(serie["store_key"], "last-chapter") or last_chapter_available
         )
         redis.hset(serie["store_key"], "last-chapter", last_chapter_available)
 
@@ -110,9 +104,7 @@ def get_next_checking(serie: Serie) -> datetime:
     now = datetime.now()
 
     try:
-        next_interval_hour = [
-            x for x in serie["check_intervals"] if x > now.hour
-        ][0]
+        next_interval_hour = [x for x in serie["check_intervals"] if x > now.hour][0]
     except IndexError:
         next_interval_hour = serie["check_intervals"][0]
 
@@ -130,13 +122,9 @@ def get_next_checking(serie: Serie) -> datetime:
 async def worker(browser: Browser, serie: Serie):
     async def _worker():
         try:
-            result = await check_new_chapter_task(
-                await browser.new_context(), serie
-            )
+            result = await check_new_chapter_task(await browser.new_context(), serie)
         except TimeoutError as error:
-            logger.warning(
-                f"{error.message}", extra={"author": serie["title"]}
-            )
+            logger.warning(f"{error.message}", extra={"author": serie["title"]})
             raise
         else:
             if not result.get("is_new_chapter_available"):
