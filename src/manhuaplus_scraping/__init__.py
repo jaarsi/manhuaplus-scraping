@@ -66,9 +66,7 @@ class ScrapingTaskResult(TypedDict):
     new_chapter_url: NotRequired[str]
 
 
-async def check_new_chapter_task(
-    context: BrowserContext, serie: Serie
-) -> ScrapingTaskResult:
+async def check_new_chapter_task(context: BrowserContext, serie: Serie) -> ScrapingTaskResult:
     try:
         page = await context.new_page()
         # page.set_default_timeout(5000)
@@ -162,17 +160,15 @@ async def worker(browser: Browser, serie: Serie):
 async def _main():
     redis.ping()
 
-    with open("manhuaplus-series.toml", mode="r") as file:
+    with open("settings.toml", mode="r") as file:
         content = toml.load(file)
 
-    series = [Serie(**item) for item in content["series"]]
+    series = [Serie(**item) for item in content.get("series", [])]
 
     async with async_playwright() as p:
         browser = await p.firefox.launch(headless=True)
         job = asyncio.gather(*[worker(browser, serie) for serie in series])
-        asyncio.get_event_loop().add_signal_handler(
-            signal.SIGTERM, lambda *args: job.cancel()
-        )
+        asyncio.get_event_loop().add_signal_handler(signal.SIGTERM, lambda *args: job.cancel())
 
         try:
             await job
