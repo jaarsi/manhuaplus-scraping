@@ -5,8 +5,8 @@ services:
             resources:
                 limits:
                     memory: 50M
-        ports:
-            - 6379:6379
+        # ports:
+        #     - 6379:6379
     app:
         build: .
         environment:
