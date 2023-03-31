@@ -3,6 +3,7 @@ import os
 from datetime import datetime, timedelta
 from typing import TypedDict
 
+import arrow
 import gevent
 import grequests
 from bs4 import BeautifulSoup
@@ -114,14 +115,12 @@ def make_worker(serie: Serie, redis: Redis) -> gevent.Greenlet:
             task.start()
             task.join()
             now = datetime.now()
-            next_checking_at = (now + timedelta(minutes=serie["check_interval"])).replace(
-                second=0, microsecond=0
-            )
+            next_checking_at = now + timedelta(minutes=serie["check_interval"])
             logger.info(
-                f"Next checking at {next_checking_at.isoformat()}.",
+                f"Next checking {arrow.get(next_checking_at).humanize(other=now)}.",
                 extra={"author": serie["title"]},
             )
-            wait_time_seconds = (next_checking_at - now).seconds
+            wait_time_seconds = (next_checking_at - now).total_seconds()
             gevent.sleep(wait_time_seconds)
 
     return gevent.spawn(_loop)
