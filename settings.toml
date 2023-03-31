@@ -32,16 +32,16 @@ handlers = ["default", "discord"]
 title = "Martial Peak"
 url = "https://manhuaplus.com/manga/martial-peak/"
 store_key = "martial-peak"
-check_interval = 360
+check_interval = [ 2, 3, 10, 14, 15, 16, 20, 22 ]
 
 [[series]]
 title = "Magic Demon Emperor"
 url = "https://manhuaplus.com/manga/demon-magic-emperor/"
 store_key = "magic-demon-emperor"
-check_interval = 1440
+check_interval = [ 22 ]
 
 [[series]]
 title = "Heavens Devourer"
 url = "https://manhuaplus.com/manga/heavens-devourer/"
 store_key = "heavens-devourer"
-check_interval = 1440
+check_interval = [ 22 ]

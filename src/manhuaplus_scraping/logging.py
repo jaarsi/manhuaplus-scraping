@@ -1,6 +1,6 @@
 import logging
 
-import grequests
+import requests
 
 from . import settings
 
@@ -11,8 +11,8 @@ class DiscordLoggingHandler(logging.Handler):
             return
 
         try:
-            grequests.post(settings.DISCORD_WH, json={"content": message, "flags": 4}).send()
-        except:
+            requests.post(settings.DISCORD_WH, json={"content": message, "flags": 4})
+        except Exception as error:
             pass
 
     def emit(self, record: logging.LogRecord) -> None:

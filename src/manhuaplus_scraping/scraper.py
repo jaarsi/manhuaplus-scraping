@@ -4,7 +4,7 @@ from typing import TypedDict
 
 import arrow
 import gevent
-import grequests
+import requests
 from bs4 import BeautifulSoup
 from redis import Redis
 
@@ -15,7 +15,7 @@ class Serie(TypedDict):
     title: str
     url: str
     store_key: str
-    check_interval: int
+    check_interval: list[int]
 
 
 class SerieChapterData(TypedDict):
@@ -33,8 +33,7 @@ def save_serie_data(serie: Serie, data: SerieChapterData, redis: Redis) -> None:
 
 
 def check_new_chapter(serie: Serie) -> SerieChapterData:
-    request = grequests.get(serie["url"], headers={"User-Agent": settings.USER_AGENT})
-    page_content = request.send().response.text
+    page_content = requests.get(serie["url"], headers={"User-Agent": settings.USER_AGENT}).text
     soup = BeautifulSoup(page_content, "lxml")
     chapter_element = soup.select(".wp-manga-chapter:nth-child(1) a")[0]
     chapter_description = chapter_element.text.strip()
@@ -45,6 +44,25 @@ def check_new_chapter(serie: Serie) -> SerieChapterData:
         "chapter_number": int(chapter_number),
         "chapter_url": chapter_link,
     }
+
+
+def get_next_checking(serie: Serie) -> datetime:
+    now = datetime.now()
+
+    try:
+        next_interval_hour = [x for x in serie["check_interval"] if x > now.hour][0]
+    except IndexError:
+        next_interval_hour = serie["check_interval"][0]
+
+    if next_interval_hour > now.hour:
+        hours_interval = next_interval_hour - now.hour
+    else:
+        hours_interval = 24 - (now.hour - next_interval_hour)
+
+    next_interval = (now + timedelta(hours=hours_interval)).replace(
+        minute=0, second=0, microsecond=0
+    )
+    return next_interval
 
 
 def make_worker(serie: Serie, redis: Redis) -> gevent.Greenlet:
@@ -76,14 +94,14 @@ def make_worker(serie: Serie, redis: Redis) -> gevent.Greenlet:
         except Exception as error:
             logger.error(repr(error), extra={"author": serie["title"]})
 
-    def _wait_for_next_checking():
+    def _wait_for_checking_time():
         try:
+            next_checking_at = get_next_checking(serie)
             now = datetime.now()
-            next_checking_at = now + timedelta(minutes=serie["check_interval"])
-            logger.info(
-                f"Next checking {arrow.get(next_checking_at).humanize(other=now)}.",
-                extra={"author": serie["title"]},
+            human_time = arrow.get(next_checking_at).humanize(
+                other=now, granularity=["hour", "minute"]
             )
+            logger.info(f"Next checking {human_time}.", extra={"author": serie["title"]})
             wait_time_seconds = (next_checking_at - now).total_seconds()
             gevent.sleep(wait_time_seconds)
         except Exception as error:
@@ -91,6 +109,7 @@ def make_worker(serie: Serie, redis: Redis) -> gevent.Greenlet:
 
     def _loop():
         while True:
+            _wait_for_checking_time()
             task = gevent.Greenlet(check_new_chapter, serie)
             # task.link_value(_success_notifier)
             task.link_exception(_error_notifier)
@@ -98,6 +117,5 @@ def make_worker(serie: Serie, redis: Redis) -> gevent.Greenlet:
             task.join()
             result: SerieChapterData = task.get()
             _success_notifier(result)
-            _wait_for_next_checking()
 
     return gevent.spawn(_loop)
