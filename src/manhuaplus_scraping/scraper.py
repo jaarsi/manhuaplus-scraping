@@ -96,9 +96,9 @@ def make_worker(serie: Serie, redis: Redis) -> gevent.Greenlet:
 
     def _wait_for_checking_time():
         try:
-            next_checking_at = get_next_checking(serie)
             now = datetime.now()
-            human_time = arrow.get(next_checking_at).humanize(
+            next_checking_at = get_next_checking(serie)
+            human_time = arrow.get(next_checking_at + timedelta(minutes=1)).humanize(
                 other=now, granularity=["hour", "minute"]
             )
             logger.info(f"Next checking {human_time}.", extra={"author": serie["title"]})
