@@ -5,14 +5,15 @@ services:
             resources:
                 limits:
                     memory: 50M
-        # ports:
-        #     - 6379:6379
+        ports:
+            - 6379:6379
     app:
         build: .
         environment:
             - REDIS_HOST=redis
             - REDIS_PORT=6379
             - DISCORD_WH=${DISCORD_WH}
+            - DISCORD_TOKEN=${DISCORD_TOKEN}
         depends_on:
             - redis
         deploy:

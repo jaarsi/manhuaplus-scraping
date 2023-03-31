@@ -6,7 +6,9 @@ import gevent
 import tomli
 from redis import Redis
 
-from . import REDIS_HOST, REDIS_PORT, make_worker
+from .discord_bot import make_discord_bot
+from .scraper import make_worker
+from .settings import DISCORD_TOKEN, REDIS_HOST, REDIS_PORT
 
 
 def main():
@@ -21,6 +23,7 @@ def main():
     try:
         redis: Redis = Redis(REDIS_HOST, REDIS_PORT, 0, decode_responses=True)
         tasks = [make_worker(serie, redis) for serie in series]
+        tasks.append(gevent.spawn(make_discord_bot, DISCORD_TOKEN, series))
 
         def _handle_shutdown(*args):
             logger.warning("Shutdown order received ...")
