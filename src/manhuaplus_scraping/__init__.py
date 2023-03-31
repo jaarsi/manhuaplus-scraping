@@ -1,11 +1,10 @@
 import logging
 import os
-import random
 from datetime import datetime, timedelta
 from typing import TypedDict
 
 import gevent
-import requests
+import grequests
 from bs4 import BeautifulSoup
 from redis import Redis
 
@@ -25,7 +24,7 @@ class DiscordLoggingHandler(logging.Handler):
             return
 
         try:
-            requests.post(DISCORD_WH, json={"content": message, "flags": 4})
+            grequests.post(DISCORD_WH, json={"content": message, "flags": 4}).send()
         except:
             pass
 
@@ -63,7 +62,8 @@ def save_serie_data(serie: Serie, data: SerieChapterData, redis: Redis) -> None:
 
 
 def check_new_chapter(serie: Serie) -> SerieChapterData:
-    page_content = requests.get(serie["url"], headers={"User-Agent": USER_AGENT}).text
+    request = grequests.get(serie["url"], headers={"User-Agent": USER_AGENT})
+    page_content = request.send().response.text
     soup = BeautifulSoup(page_content, "lxml")
     chapter_element = soup.select(".wp-manga-chapter:nth-child(1) a")[0]
     chapter_description = chapter_element.text.strip()
@@ -92,12 +92,13 @@ def make_worker(serie: Serie, redis: Redis) -> gevent.Greenlet:
             }
 
             if last_chapter["chapter_number"] <= int(serie_data["chapter_number"]):
-                # logger.info("No New Chapter Available ", extra={"author": serie["title"]})
+                logger.info("No New Chapter Available", extra={"author": serie["title"]})
                 return
 
             logger.info(
-                "New Chapter Available "
-                f"{serie_data['chapter_number']} => {last_chapter['chapter_number']}\n"
+                "**New Chapter Available "
+                f"[{serie_data['chapter_number']} => {last_chapter['chapter_number']}]**\n"
+                f"{last_chapter['chapter_description']} \n"
                 f"{last_chapter['chapter_url']}",
                 extra={"author": serie["title"]},
             )

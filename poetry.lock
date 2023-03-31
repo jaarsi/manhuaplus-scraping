@@ -396,6 +396,22 @@ docs = ["Sphinx", "docutils (<0.18)"]
 test = ["objgraph", "psutil"]
 
 [[package]]
+name = "grequests"
+version = "0.6.0"
+description = "Requests + Gevent"
+category = "main"
+optional = false
+python-versions = "*"
+files = [
+    {file = "grequests-0.6.0-py3-none-any.whl", hash = "sha256:6eff964416021bb1dee4182a56cc2b551bfa42d37820e6aee6f2efa00d43a061"},
+    {file = "grequests-0.6.0.tar.gz", hash = "sha256:7dec890c6668e6755a1ea968565535867956639301268394d24df67b478df666"},
+]
+
+[package.dependencies]
+gevent = "*"
+requests = "*"
+
+[[package]]
 name = "identify"
 version = "2.5.22"
 description = "File identification library for Python"
@@ -817,4 +833,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "1c0624154a3eb31259eff7d4f65176b6520b06ef3dada06cef26f4116671d677"
+content-hash = "58c7a88c32d26b6423131e90afc037b5fddc6d23fe4eace52e4191f14f9a5845"
