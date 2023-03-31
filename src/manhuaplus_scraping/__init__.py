@@ -1,13 +1,11 @@
 import logging
-import logging.config
 import os
-import signal
+import random
 from datetime import datetime, timedelta
 from typing import TypedDict
 
 import gevent
 import requests
-import tomli
 from bs4 import BeautifulSoup
 from redis import Redis
 
@@ -82,9 +80,9 @@ def make_worker(serie: Serie, redis: Redis) -> gevent.Greenlet:
     logger = logging.getLogger("manhuaplus_scraping")
 
     def _error_notifier(job):
-        logger.error(str(job.exception), extra={"author": serie["title"]})
+        logger.error(repr(job.exception), extra={"author": serie["title"]})
 
-    def _new_chapter_notifier(job):
+    def _success_notifier(job):
         try:
             last_chapter: SerieChapterData = job.value
             serie_data: SerieChapterData = load_serie_data(serie, redis) or {
@@ -110,12 +108,14 @@ def make_worker(serie: Serie, redis: Redis) -> gevent.Greenlet:
     def _loop():
         while True:
             task = gevent.Greenlet(check_new_chapter, serie)
-            task.link_value(_new_chapter_notifier)
+            task.link_value(_success_notifier)
             task.link_exception(_error_notifier)
             task.start()
             task.join()
             now = datetime.now()
-            next_checking_at = now + timedelta(seconds=serie["check_interval"])
+            next_checking_at = (now + timedelta(minutes=serie["check_interval"])).replace(
+                second=0, microsecond=0
+            )
             logger.info(
                 f"Next checking at {next_checking_at.isoformat()}.",
                 extra={"author": serie["title"]},
@@ -124,29 +124,3 @@ def make_worker(serie: Serie, redis: Redis) -> gevent.Greenlet:
             gevent.sleep(wait_time_seconds)
 
     return gevent.spawn(_loop)
-
-
-def main():
-    with open("settings.toml", mode="rb") as file:
-        settings = tomli.load(file)
-
-    logging.config.dictConfig(settings.get("logging"))  # type: ignore
-    logger = logging.getLogger("manhuaplus_scraping")
-    logger.info("Starting Manhuaplus scraping service.")
-    series = settings.get("series", [])
-
-    try:
-        redis: Redis = Redis(REDIS_HOST, REDIS_PORT, 0, decode_responses=True)
-        tasks = [make_worker(serie, redis) for serie in series]
-
-        def _handle_shutdown(*args):
-            logger.warning("Shutdown order received ...")
-            gevent.killall(tasks, block=False)
-
-        signal.signal(signal.SIGTERM, _handle_shutdown)
-        signal.signal(signal.SIGINT, _handle_shutdown)
-        gevent.joinall(tasks, raise_error=True)
-    except Exception as error:
-        logger.error("Unexpected error ocurred => %s", str(error))
-
-    logger.info("Manhuaplus scraping service is down.")
