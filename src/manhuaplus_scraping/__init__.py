@@ -1,15 +1,24 @@
-import asyncio
 import logging
 import logging.config
 import os
 import signal
 from datetime import datetime, timedelta
+from typing import TypedDict
 
-import requests  # type: ignore
-import toml  # type: ignore
-from playwright.async_api import Browser, BrowserContext, TimeoutError, async_playwright
-from redis import Redis  # type: ignore
-from typing_extensions import NotRequired, TypedDict
+import gevent
+import requests
+import tomli
+from bs4 import BeautifulSoup
+from redis import Redis
+
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+DISCORD_WH = os.getenv("DISCORD_WH", None)
+USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/111.0.0.0 Safari/537.36"
+)
 
 
 class DiscordLoggingHandler(logging.Handler):
@@ -19,7 +28,7 @@ class DiscordLoggingHandler(logging.Handler):
 
         try:
             requests.post(DISCORD_WH, json={"content": message, "flags": 4})
-        except Exception:
+        except:
             pass
 
     def emit(self, record: logging.LogRecord) -> None:
@@ -34,157 +43,109 @@ class CustomFormatter(logging.Formatter):
         super().__init__(**kwargs, defaults={"author": "System"})
 
 
-def get_logger(name: str) -> logging.Logger:
-    path = os.path.join(os.path.dirname(__file__), "_logging.toml")
-
-    with open(path) as file:
-        config = toml.load(file)
-
-    logging.config.dictConfig(config)
-    return logging.getLogger(name)
-
-
-logger = get_logger("manhuaplus_scraping")
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
-DISCORD_WH = os.getenv("DISCORD_WH", None)
-redis: Redis = Redis(REDIS_HOST, REDIS_PORT, 0)
-
-
 class Serie(TypedDict):
     title: str
     url: str
     store_key: str
-    check_intervals: list[int]
+    check_interval: int
 
 
-class ScrapingTaskResult(TypedDict):
-    serie: Serie
-    last_chapter_saved: int
-    is_new_chapter_available: bool
-    new_chapter_number: NotRequired[int]
-    new_chapter_url: NotRequired[str]
+class SerieChapterData(TypedDict):
+    chapter_number: int
+    chapter_description: str
+    chapter_url: str
 
 
-async def check_new_chapter_task(context: BrowserContext, serie: Serie) -> ScrapingTaskResult:
-    try:
-        page = await context.new_page()
-        # page.set_default_timeout(5000)
-        await page.goto(serie["url"], wait_until="domcontentloaded")
-        element = page.locator(".wp-manga-chapter:nth-child(1) a")
-        _, value, *_ = (await element.text_content()).split()  # type: ignore
-        last_chapter_available = int(value)
-        last_chapter_available_link = await element.get_attribute("href")
-        last_chapter_saved = int(
-            redis.hget(serie["store_key"], "last-chapter") or last_chapter_available
-        )
-        redis.hset(serie["store_key"], "last-chapter", last_chapter_available)
-
-        if last_chapter_available <= last_chapter_saved:
-            return ScrapingTaskResult(
-                serie=serie,
-                last_chapter_saved=last_chapter_saved,
-                is_new_chapter_available=False,
-            )
-
-        return ScrapingTaskResult(
-            serie=serie,
-            last_chapter_saved=last_chapter_saved,
-            is_new_chapter_available=True,
-            new_chapter_number=last_chapter_available,
-            new_chapter_url=last_chapter_available_link,  # type: ignore
-        )
-    finally:
-        await context.close()
+def load_serie_data(serie: Serie, redis: Redis) -> SerieChapterData:
+    return redis.hgetall(serie["store_key"])  # type: ignore
 
 
-def get_next_checking(serie: Serie) -> datetime:
-    now = datetime.now()
-
-    try:
-        next_interval_hour = [x for x in serie["check_intervals"] if x > now.hour][0]
-    except IndexError:
-        next_interval_hour = serie["check_intervals"][0]
-
-    if next_interval_hour > now.hour:
-        hours_interval = next_interval_hour - now.hour
-    else:
-        hours_interval = 24 - (now.hour - next_interval_hour)
-
-    next_interval = (now + timedelta(hours=hours_interval)).replace(
-        minute=0, second=0, microsecond=0
-    )
-    return next_interval
+def save_serie_data(serie: Serie, data: SerieChapterData, redis: Redis) -> None:
+    redis.hset(serie["store_key"], mapping=data)  # type: ignore
 
 
-async def worker(browser: Browser, serie: Serie):
-    async def _worker():
+def check_new_chapter(serie: Serie) -> SerieChapterData:
+    page_content = requests.get(serie["url"], headers={"User-Agent": USER_AGENT}).text
+    soup = BeautifulSoup(page_content, "lxml")
+    chapter_element = soup.select(".wp-manga-chapter:nth-child(1) a")[0]
+    chapter_description = chapter_element.text.strip()
+    _, chapter_number, *_ = chapter_description.split()
+    chapter_link = chapter_element.attrs["href"]
+    return {
+        "chapter_description": chapter_description,
+        "chapter_number": int(chapter_number),
+        "chapter_url": chapter_link,
+    }
+
+
+def make_worker(serie: Serie, redis: Redis) -> gevent.Greenlet:
+    logger = logging.getLogger("manhuaplus_scraping")
+
+    def _error_notifier(job):
+        logger.error(str(job.exception), extra={"author": serie["title"]})
+
+    def _new_chapter_notifier(job):
         try:
-            result = await check_new_chapter_task(await browser.new_context(), serie)
-        except TimeoutError as error:
-            logger.warning(f"{error.message}", extra={"author": serie["title"]})
-            raise
-        else:
-            if not result.get("is_new_chapter_available"):
-                logger.info(
-                    "No New Chapter Available.",
-                    extra={"author": serie["title"]},
-                )
+            last_chapter: SerieChapterData = job.value
+            serie_data: SerieChapterData = load_serie_data(serie, redis) or {
+                **last_chapter,
+                "chapter_number": 0,
+                "chapter_url": "",
+            }
+
+            if last_chapter["chapter_number"] <= int(serie_data["chapter_number"]):
+                logger.info("No New Chapter Available ", extra={"author": serie["title"]})
                 return
 
             logger.info(
-                f"New Chapter Available {result['last_chapter_saved']} => "
-                f"{result['new_chapter_number']}\n"
-                f"{result['new_chapter_url']}",
+                "New Chapter Available "
+                f"{serie_data['chapter_number']} => {last_chapter['chapter_number']}\n"
+                f"{last_chapter['chapter_url']}",
                 extra={"author": serie["title"]},
             )
-
-    next_checking_at = get_next_checking(serie)
-
-    while True:
-        logger.info(
-            f"Next checking at {next_checking_at.isoformat()}.",
-            extra={"author": serie["title"]},
-        )
-        wait_seconds_interval = (next_checking_at - datetime.now()).seconds
-        await asyncio.sleep(wait_seconds_interval)
-
-        try:
-            await _worker()
-        except:
-            next_checking_at = datetime.now() + timedelta(seconds=30)
-        else:
-            next_checking_at = get_next_checking(serie)
-
-
-async def _main():
-    redis.ping()
-
-    with open("settings.toml", mode="r") as file:
-        content = toml.load(file)
-
-    series = [Serie(**item) for item in content.get("series", [])]
-
-    async with async_playwright() as p:
-        browser = await p.firefox.launch(headless=True)
-        job = asyncio.gather(*[worker(browser, serie) for serie in series])
-        asyncio.get_event_loop().add_signal_handler(signal.SIGTERM, lambda *args: job.cancel())
-
-        try:
-            await job
-        except asyncio.CancelledError:
-            logger.warning("Cancel scraping order received.")
+            save_serie_data(serie, last_chapter, redis)
         except Exception as error:
-            job.cancel(str(error))
-        finally:
-            await browser.close()
+            logger.error(repr(error), extra={"author": serie["title"]})
+
+    def _loop():
+        while True:
+            task = gevent.Greenlet(check_new_chapter, serie)
+            task.link_value(_new_chapter_notifier)
+            task.link_exception(_error_notifier)
+            task.start()
+            task.join()
+            now = datetime.now()
+            next_checking_at = now + timedelta(seconds=serie["check_interval"])
+            logger.info(
+                f"Next checking at {next_checking_at.isoformat()}.",
+                extra={"author": serie["title"]},
+            )
+            wait_time_seconds = (next_checking_at - now).seconds
+            gevent.sleep(wait_time_seconds)
+
+    return gevent.spawn(_loop)
 
 
 def main():
+    with open("settings.toml", mode="rb") as file:
+        settings = tomli.load(file)
+
+    logging.config.dictConfig(settings.get("logging"))  # type: ignore
+    logger = logging.getLogger("manhuaplus_scraping")
     logger.info("Starting Manhuaplus scraping service.")
+    series = settings.get("series", [])
 
     try:
-        asyncio.run(_main())
+        redis: Redis = Redis(REDIS_HOST, REDIS_PORT, 0, decode_responses=True)
+        tasks = [make_worker(serie, redis) for serie in series]
+
+        def _handle_shutdown(*args):
+            logger.warning("Shutdown order received ...")
+            gevent.killall(tasks, block=False)
+
+        signal.signal(signal.SIGTERM, _handle_shutdown)
+        signal.signal(signal.SIGINT, _handle_shutdown)
+        gevent.joinall(tasks, raise_error=True)
     except Exception as error:
         logger.error("Unexpected error ocurred => %s", str(error))
 

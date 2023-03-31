@@ -1,17 +1,47 @@
+[logging]
+version = 1
+disable_existing_loggers = false
+
+[logging.formatters]
+
+[logging.formatters.default]
+"()" = "manhuaplus_scraping.CustomFormatter"
+format = '[ %(asctime)s ] [ %(author)s ] [ %(levelname)s ] %(message)s'
+
+[logging.formatters.discord]
+"()" = "manhuaplus_scraping.CustomFormatter"
+format = '>>> **[ %(author)s ] [ %(levelname)s ]** %(message)s'
+
+[logging.handlers]
+
+[logging.handlers.default]
+class = "logging.StreamHandler"
+formatter = "default"
+
+[logging.handlers.discord]
+class = "manhuaplus_scraping.DiscordLoggingHandler"
+formatter = "discord"
+
+[logging.loggers]
+
+[logging.loggers.manhuaplus_scraping]
+level = "INFO"
+handlers = ["default", "discord"]
+
 [[series]]
 title = "Martial Peak"
 url = "https://manhuaplus.com/manga/martial-peak/"
 store_key = "martial-peak"
-check_intervals = [3,10,16,20,23]
+check_interval = 3600
 
 [[series]]
 title = "Magic Demon Emperor"
 url = "https://manhuaplus.com/manga/demon-magic-emperor/"
 store_key = "magic-demon-emperor"
-check_intervals = [12,]
+check_interval = 43200
 
 [[series]]
 title = "Heavens Devourer"
 url = "https://manhuaplus.com/manga/heavens-devourer/"
 store_key = "heavens-devourer"
-check_intervals = [12,]
+check_interval = 43200
