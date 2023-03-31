@@ -55,11 +55,11 @@ class SerieChapterData(TypedDict):
 
 
 def load_serie_data(serie: Serie, redis: Redis) -> SerieChapterData:
-    return redis.hgetall(serie["store_key"])  # type: ignore
+    return redis.hgetall(f"{serie['store_key']}-last-chapter")  # type: ignore
 
 
 def save_serie_data(serie: Serie, data: SerieChapterData, redis: Redis) -> None:
-    redis.hset(serie["store_key"], mapping=data)  # type: ignore
+    redis.hset(f"{serie['store_key']}-last-chapter", mapping=data)  # type: ignore
 
 
 def check_new_chapter(serie: Serie) -> SerieChapterData:
@@ -83,9 +83,8 @@ def make_worker(serie: Serie, redis: Redis) -> gevent.Greenlet:
     def _error_notifier(job):
         logger.error(repr(job.exception), extra={"author": serie["title"]})
 
-    def _success_notifier(job):
+    def _success_notifier(last_chapter: SerieChapterData):
         try:
-            last_chapter: SerieChapterData = job.value
             serie_data: SerieChapterData = load_serie_data(serie, redis) or {
                 **last_chapter,
                 "chapter_number": 0,
@@ -107,13 +106,8 @@ def make_worker(serie: Serie, redis: Redis) -> gevent.Greenlet:
         except Exception as error:
             logger.error(repr(error), extra={"author": serie["title"]})
 
-    def _loop():
-        while True:
-            task = gevent.Greenlet(check_new_chapter, serie)
-            task.link_value(_success_notifier)
-            task.link_exception(_error_notifier)
-            task.start()
-            task.join()
+    def _wait_for_next_checking():
+        try:
             now = datetime.now()
             next_checking_at = now + timedelta(minutes=serie["check_interval"])
             logger.info(
@@ -122,5 +116,18 @@ def make_worker(serie: Serie, redis: Redis) -> gevent.Greenlet:
             )
             wait_time_seconds = (next_checking_at - now).total_seconds()
             gevent.sleep(wait_time_seconds)
+        except Exception as error:
+            logger.error(repr(error), extra={"author": serie["title"]})
+
+    def _loop():
+        while True:
+            task = gevent.Greenlet(check_new_chapter, serie)
+            # task.link_value(_success_notifier)
+            task.link_exception(_error_notifier)
+            task.start()
+            task.join()
+            result: SerieChapterData = task.get()
+            _success_notifier(result)
+            _wait_for_next_checking()
 
     return gevent.spawn(_loop)
