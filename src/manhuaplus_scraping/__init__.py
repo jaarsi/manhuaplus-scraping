@@ -92,7 +92,7 @@ def make_worker(serie: Serie, redis: Redis) -> gevent.Greenlet:
             }
 
             if last_chapter["chapter_number"] <= int(serie_data["chapter_number"]):
-                logger.info("No New Chapter Available ", extra={"author": serie["title"]})
+                # logger.info("No New Chapter Available ", extra={"author": serie["title"]})
                 return
 
             logger.info(
@@ -116,10 +116,10 @@ def make_worker(serie: Serie, redis: Redis) -> gevent.Greenlet:
             next_checking_at = (now + timedelta(minutes=serie["check_interval"])).replace(
                 second=0, microsecond=0
             )
-            logger.info(
-                f"Next checking at {next_checking_at.isoformat()}.",
-                extra={"author": serie["title"]},
-            )
+            # logger.info(
+            #     f"Next checking at {next_checking_at.isoformat()}.",
+            #     extra={"author": serie["title"]},
+            # )
             wait_time_seconds = (next_checking_at - now).seconds
             gevent.sleep(wait_time_seconds)
 
