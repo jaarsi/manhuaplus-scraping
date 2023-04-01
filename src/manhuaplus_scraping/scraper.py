@@ -1,9 +1,9 @@
+import asyncio
 import logging
 from datetime import datetime, timedelta
 from typing import TypedDict
 
 import arrow
-import gevent
 import requests
 from bs4 import BeautifulSoup
 from redis import Redis
@@ -32,7 +32,7 @@ def save_serie_data(serie: Serie, data: SerieChapterData, redis: Redis) -> None:
     redis.hset(f"{serie['store_key']}-last-chapter", mapping=data)  # type: ignore
 
 
-def check_new_chapter(serie: Serie) -> SerieChapterData:
+def fetch_last_chapter(serie: Serie) -> SerieChapterData:
     page_content = requests.get(serie["url"], headers={"User-Agent": settings.USER_AGENT}).text
     soup = BeautifulSoup(page_content, "lxml")
     chapter_element = soup.select(".wp-manga-chapter:nth-child(1) a")[0]
@@ -46,7 +46,7 @@ def check_new_chapter(serie: Serie) -> SerieChapterData:
     }
 
 
-def get_next_checking(serie: Serie) -> datetime:
+def calculate_next_checking(serie: Serie) -> datetime:
     now = datetime.now()
 
     try:
@@ -65,11 +65,11 @@ def get_next_checking(serie: Serie) -> datetime:
     return next_interval
 
 
-def make_worker(serie: Serie, redis: Redis) -> gevent.Greenlet:
+async def make_worker(serie: Serie, redis: Redis) -> None:
     logger = logging.getLogger("manhuaplus_scraping")
 
-    def _error_notifier(job):
-        logger.error(repr(job.exception), extra={"author": serie["title"]})
+    def _error_notifier(error: Exception):
+        logger.error(repr(error), extra={"author": serie["title"]})
 
     def _success_notifier(last_chapter: SerieChapterData):
         try:
@@ -94,28 +94,28 @@ def make_worker(serie: Serie, redis: Redis) -> gevent.Greenlet:
         except Exception as error:
             logger.error(repr(error), extra={"author": serie["title"]})
 
-    def _wait_for_checking_time():
+    async def _wait_for_checking_time():
         try:
             now = datetime.now()
-            next_checking_at = get_next_checking(serie)
+            next_checking_at = calculate_next_checking(serie)
             human_time = arrow.get(next_checking_at + timedelta(minutes=1)).humanize(
                 other=now, granularity=["hour", "minute"]
             )
             logger.info(f"Next checking {human_time}.", extra={"author": serie["title"]})
             wait_time_seconds = (next_checking_at - now).total_seconds()
-            gevent.sleep(wait_time_seconds)
+            await asyncio.sleep(wait_time_seconds)
         except Exception as error:
             logger.error(repr(error), extra={"author": serie["title"]})
 
-    def _loop():
+    async def _loop():
         while True:
-            _wait_for_checking_time()
-            task = gevent.Greenlet(check_new_chapter, serie)
-            # task.link_value(_success_notifier)
-            task.link_exception(_error_notifier)
-            task.start()
-            task.join()
-            result: SerieChapterData = task.get()
-            _success_notifier(result)
+            await _wait_for_checking_time()
 
-    return gevent.spawn(_loop)
+            try:
+                result = fetch_last_chapter(serie)
+            except Exception as error:
+                _error_notifier(error)
+            else:
+                _success_notifier(result)
+
+    await _loop()

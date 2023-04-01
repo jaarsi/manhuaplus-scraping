@@ -8,4 +8,4 @@ USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/111.0.0.0 Safari/537.36"
 )
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", None)
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", "")
