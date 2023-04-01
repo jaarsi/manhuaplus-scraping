@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta
 
 import arrow
@@ -12,6 +13,12 @@ async def make_discord_bot(discord_token: str, series: list[Serie]):
     _series = {item["store_key"]: item for item in series}
     bot = discord.Bot(intents=discord.Intents.all())
 
+    @bot.slash_command(name="waitfor", guild_ids=GUILD_IDS)
+    async def waitfor(ctx: discord.ApplicationContext, t: int):
+        await ctx.respond(f"waiteing for {t} seconds")
+        await asyncio.sleep(t)
+        await ctx.respond(f"Done")
+
     @bot.slash_command(name="last-chapter", guild_ids=GUILD_IDS)
     @discord.option("serie_name", choices=[*_series.keys()])
     async def last_chapter_cmd(ctx: discord.ApplicationContext, serie_name: str):
@@ -20,7 +27,7 @@ async def make_discord_bot(discord_token: str, series: list[Serie]):
             return
 
         await ctx.respond(f"**Wait while im fetching the last chapter from {serie_name} ...**")
-        last_chapter = fetch_last_chapter(serie)
+        last_chapter = await asyncio.create_task(fetch_last_chapter(serie))
         message = (
             f">>> **[ {serie['title']} ] Last Chapter Available "
             f"=> [{last_chapter['chapter_number']}]**\n"

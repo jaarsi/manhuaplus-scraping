@@ -1,10 +1,10 @@
 import asyncio
 import logging
+import random
 from datetime import datetime, timedelta
 from typing import TypedDict
 
-import arrow
-import requests
+import httpx
 from bs4 import BeautifulSoup
 from redis import Redis
 
@@ -32,8 +32,11 @@ def save_serie_data(serie: Serie, data: SerieChapterData, redis: Redis) -> None:
     redis.hset(f"{serie['store_key']}-last-chapter", mapping=data)  # type: ignore
 
 
-def fetch_last_chapter(serie: Serie) -> SerieChapterData:
-    page_content = requests.get(serie["url"], headers={"User-Agent": settings.USER_AGENT}).text
+async def fetch_last_chapter(serie: Serie) -> SerieChapterData:
+    async with httpx.AsyncClient() as client:
+        response = await client.get(serie["url"], headers={"User-Agent": settings.USER_AGENT})
+
+    page_content = response.text
     soup = BeautifulSoup(page_content, "lxml")
     chapter_element = soup.select(".wp-manga-chapter:nth-child(1) a")[0]
     chapter_description = chapter_element.text.strip()
@@ -67,6 +70,7 @@ def calculate_next_checking(serie: Serie) -> datetime:
 
 async def make_worker(serie: Serie, redis: Redis) -> None:
     logger = logging.getLogger("manhuaplus_scraping")
+    loop = asyncio.get_event_loop()
 
     def _error_notifier(error: Exception):
         logger.error(repr(error), extra={"author": serie["title"]})
@@ -98,24 +102,22 @@ async def make_worker(serie: Serie, redis: Redis) -> None:
         try:
             now = datetime.now()
             next_checking_at = calculate_next_checking(serie)
-            human_time = arrow.get(next_checking_at + timedelta(minutes=1)).humanize(
-                other=now, granularity=["hour", "minute"]
-            )
-            logger.info(f"Next checking {human_time}.", extra={"author": serie["title"]})
             wait_time_seconds = (next_checking_at - now).total_seconds()
             await asyncio.sleep(wait_time_seconds)
         except Exception as error:
             logger.error(repr(error), extra={"author": serie["title"]})
 
-    async def _loop():
-        while True:
-            await _wait_for_checking_time()
+    async def _worker():
+        await _wait_for_checking_time()
 
-            try:
-                result = fetch_last_chapter(serie)
-            except Exception as error:
-                _error_notifier(error)
-            else:
-                _success_notifier(result)
+        try:
+            result = await asyncio.create_task(fetch_last_chapter(serie))
+        except Exception as error:
+            _error_notifier(error)
+        else:
+            _success_notifier(result)
 
-    await _loop()
+    while True:
+        await _worker()
+        # await asyncio.sleep(random.randint(2, 5))
+        # logger.info(serie["store_key"])

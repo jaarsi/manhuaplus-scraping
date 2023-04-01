@@ -11,20 +11,20 @@ from .scraper import make_worker
 from .settings import DISCORD_TOKEN, REDIS_HOST, REDIS_PORT
 
 
-async def main():
+def main():
     with open("settings.toml", mode="rb") as file:
         settings = tomli.load(file)
 
     logging.config.dictConfig(settings.get("logging"))  # type: ignore
     logger = logging.getLogger("manhuaplus_scraping")
     logger.info("Starting Manhuaplus scraping service.")
+    redis: Redis = Redis(REDIS_HOST, REDIS_PORT, 0, decode_responses=True)
     series = settings.get("series", [])
 
-    try:
-        redis: Redis = Redis(REDIS_HOST, REDIS_PORT, 0, decode_responses=True)
-        scraping_tasks = [make_worker(serie, redis) for serie in series]
+    async def _main():
+        series_scraping_task = [make_worker(serie, redis) for serie in series]
         discord_bot_task = make_discord_bot(DISCORD_TOKEN, series)
-        tasks = asyncio.gather(*[discord_bot_task, *scraping_tasks])
+        tasks = asyncio.gather(*[discord_bot_task, *series_scraping_task])
 
         def _handle_shutdown(*args):
             logger.warning("Shutdown order received ...")
@@ -32,12 +32,18 @@ async def main():
 
         loop = asyncio.get_event_loop()
         loop.add_signal_handler(signal.SIGTERM, _handle_shutdown)
+        loop.add_signal_handler(signal.SIGINT, _handle_shutdown)
         await tasks
+
+    try:
+        asyncio.run(_main())
     except Exception as error:
         logger.error("Unexpected error ocurred => %s", repr(error))
-
-    logger.info("Manhuaplus scraping service is down.")
+    except (asyncio.CancelledError, KeyboardInterrupt):
+        pass
+    finally:
+        logger.info("Manhuaplus scraping service is down.")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
