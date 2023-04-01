@@ -1,6 +1,6 @@
 import logging
 
-import httpx
+import requests
 
 from . import settings
 
@@ -11,7 +11,7 @@ class DiscordLoggingHandler(logging.Handler):
             return
 
         try:
-            httpx.post(settings.DISCORD_WH, json={"content": message, "flags": 4})
+            requests.post(settings.DISCORD_WH, json={"content": message, "flags": 4})
         except Exception:
             pass
 

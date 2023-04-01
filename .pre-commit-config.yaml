@@ -13,13 +13,12 @@ repos:
     rev: 5.12.0
     hooks:
     -   id: isort
-        args: [ "--profile", "black", "--line-length", "100" ]
+        args: [ "--profile", "black" ]
 
 -   repo: https://github.com/psf/black
     rev: 23.1.0
     hooks:
     -   id: black
-        args: [ "--line-length", "100" ]
 
 -   repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.1.1

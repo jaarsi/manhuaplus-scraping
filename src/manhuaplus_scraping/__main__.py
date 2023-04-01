@@ -7,7 +7,7 @@ import tomli
 from redis import Redis
 
 from .discord_bot import make_discord_bot
-from .scraper import make_worker
+from .scraper import make_serie_scraper_worker
 from .settings import DISCORD_TOKEN, REDIS_HOST, REDIS_PORT
 
 
@@ -22,9 +22,11 @@ def main():
     series = settings.get("series", [])
 
     async def _main():
-        series_scraping_task = [make_worker(serie, redis) for serie in series]
-        discord_bot_task = make_discord_bot(DISCORD_TOKEN, series)
-        tasks = asyncio.gather(*[discord_bot_task, *series_scraping_task])
+        series_scraping_workers = [
+            make_serie_scraper_worker(serie, redis) for serie in series
+        ]
+        discord_bot_worker = make_discord_bot(DISCORD_TOKEN, series)
+        tasks = asyncio.gather(*[discord_bot_worker, *series_scraping_workers])
 
         def _handle_shutdown(*args):
             logger.warning("Shutdown order received ...")
@@ -39,7 +41,7 @@ def main():
         asyncio.run(_main())
     except Exception as error:
         logger.error("Unexpected error ocurred => %s", repr(error))
-    except (asyncio.CancelledError, KeyboardInterrupt):
+    except BaseException:
         pass
     finally:
         logger.info("Manhuaplus scraping service is down.")
