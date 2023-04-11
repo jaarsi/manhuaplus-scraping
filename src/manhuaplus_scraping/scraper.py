@@ -83,7 +83,8 @@ def make_serie_scraper_worker(serie: Serie, redis: Redis):
 
             logger.info(
                 "**New Chapter Available "
-                f"[{serie_data['chapter_number']} => {last_chapter['chapter_number']}]**\n"
+                f"[{serie_data['chapter_number']} => "
+                f"{last_chapter['chapter_number']}]**\n"
                 f"{last_chapter['chapter_description']} \n"
                 f"{last_chapter['chapter_url']}",
                 extra={"author": serie["title"]},

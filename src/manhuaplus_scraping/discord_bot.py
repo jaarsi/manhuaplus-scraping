@@ -17,7 +17,7 @@ def make_discord_bot(discord_token: str, series: list[Serie]):
     async def _(ctx: discord.ApplicationContext, t: int):
         await ctx.respond(f"waiting for {t} seconds")
         await asyncio.sleep(t)
-        await ctx.respond(f"Done")
+        await ctx.respond("Done")
 
     @bot.slash_command(name="last-chapter", guild_ids=GUILD_IDS)
     @discord.option("serie_name", choices=[*_series.keys()])
