@@ -1,5 +1,7 @@
 import os
 
+BASE_DIR = os.path.dirname(__file__)
+SETTINGS_FILE = os.path.join(BASE_DIR, "settings.toml")
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 DISCORD_WH = os.getenv("DISCORD_WH", None)

@@ -8,15 +8,16 @@ from redis import Redis
 
 from .discord_bot import make_discord_bot
 from .scraper import make_serie_scraper_worker
-from .settings import DISCORD_TOKEN, REDIS_HOST, REDIS_PORT
+from .settings import DISCORD_TOKEN, REDIS_HOST, REDIS_PORT, SETTINGS_FILE
+
+with open(SETTINGS_FILE, mode="rb") as file:
+    settings = tomli.load(file)
+
+logging.config.dictConfig(settings.get("logging"))  # type: ignore
+logger = logging.getLogger("manhuaplus_scraping")
 
 
 def main():
-    with open("settings.toml", mode="rb") as file:
-        settings = tomli.load(file)
-
-    logging.config.dictConfig(settings.get("logging"))  # type: ignore
-    logger = logging.getLogger("manhuaplus_scraping")
     logger.info("Starting Manhuaplus scraping service.")
     redis: Redis = Redis(REDIS_HOST, REDIS_PORT, 0, decode_responses=True)
     series = settings.get("series", [])
