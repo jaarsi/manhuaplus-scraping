@@ -1,17 +1,17 @@
-import logging
+import logging.config
 
 import requests
 
-from . import settings
+from .settings import DISCORD_WH
 
 
 class DiscordLoggingHandler(logging.Handler):
     def _send_discord_notification(self, message: str):
-        if not (settings.DISCORD_WH and message):
+        if not (DISCORD_WH and message):
             return
 
         try:
-            requests.post(settings.DISCORD_WH, json={"content": message, "flags": 4})
+            requests.post(DISCORD_WH, json={"content": message, "flags": 4})
         except Exception:
             pass
 

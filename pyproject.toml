@@ -25,6 +25,9 @@ pre-commit = "^3.0.4"
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
+[tool.ruff]
+ignore = [ "E501" ]
+
 [tool.mypy]
 ignore_missing_imports = true
 check_untyped_defs = true

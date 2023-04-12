@@ -4,16 +4,16 @@ from datetime import datetime, timedelta
 import arrow
 import discord
 
-from .scraper import Serie, fetch_last_chapter, next_checking_seconds
+from . import manhua
 
 GUILD_IDS = [961618505017483374]
 
 
-def make_discord_bot(discord_token: str, series: list[Serie]):
+def start_discord_bot(discord_token: str, series: list[manhua.Serie]):
     _series = {item["store_key"]: item for item in series}
     bot = discord.Bot(intents=discord.Intents.all())
 
-    @bot.slash_command(name="waitfor", guild_ids=GUILD_IDS)
+    @bot.slash_command(name="wait-for", guild_ids=GUILD_IDS)
     async def _(ctx: discord.ApplicationContext, t: int):
         await ctx.respond(f"waiting for {t} seconds")
         await asyncio.sleep(t)
@@ -29,7 +29,7 @@ def make_discord_bot(discord_token: str, series: list[Serie]):
         await ctx.respond(
             f"**Wait while im fetching the last chapter from {serie_name} ...**"
         )
-        last_chapter = await asyncio.to_thread(fetch_last_chapter, serie)
+        last_chapter = await asyncio.to_thread(manhua.fetch_last_chapter, serie)
         message = (
             f">>> **[ {serie['title']} ] Last Chapter Available "
             f"=> [{last_chapter['chapter_number']}]**\n"
@@ -50,7 +50,7 @@ def make_discord_bot(discord_token: str, series: list[Serie]):
 
         for _, serie in _series.items():
             next_checking_at = now + timedelta(
-                seconds=next_checking_seconds(now, serie), minutes=1
+                seconds=manhua.next_checking_seconds(now, serie), minutes=1
             )
             human_time = arrow.get(next_checking_at).humanize(
                 other=now, granularity=["hour", "minute"]
