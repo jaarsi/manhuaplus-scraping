@@ -9,8 +9,8 @@ REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 DISCORD_WH = os.getenv("DISCORD_WH", None)
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", "")
 
-with open(SETTINGS_FILE, mode="rb") as file:
-    _settings = tomli.load(file)
+with open(SETTINGS_FILE, mode="rb") as _file:
+    _settings = tomli.load(_file)
 
 
 LOGGING_CONFIG: dict = _settings["logging"]
