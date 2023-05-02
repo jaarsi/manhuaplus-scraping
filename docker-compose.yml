@@ -1,23 +1,12 @@
 services:
-    redis:
-        image: redis
-        deploy:
-            resources:
-                limits:
-                    memory: 50M
-        ports:
-            - "6379:6379"
     app:
         build: .
         environment:
-            - REDIS_HOST=redis
-            - REDIS_PORT=6379
             - DISCORD_WH=${DISCORD_WH}
             - DISCORD_TOKEN=${DISCORD_TOKEN}
-        depends_on:
-            - redis
         deploy:
             resources:
                 limits:
                     # cpus: '0.50'
-                    memory: 800M
+                    memory: 500M
+        restart: "always"

@@ -5,7 +5,9 @@ from typing import TypedDict
 
 import requests
 from bs4 import BeautifulSoup
-from .store import redis, Redis
+from tinydb import TinyDB
+from tinydb.table import Document
+
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -14,9 +16,11 @@ USER_AGENT = (
 )
 
 logger = logging.getLogger("manhuaplus_scraping")
+db = TinyDB("db.json")
 
 
 class Serie(TypedDict):
+    id: int
     title: str
     url: str
     store_key: str
@@ -29,12 +33,14 @@ class SerieChapter(TypedDict):
     chapter_url: str
 
 
-def load_chapter_data(serie: Serie, redis: Redis) -> SerieChapter:
-    return redis.hgetall(f"{serie['store_key']}-last-chapter")  # type: ignore
+def load_chapter_data(serie: Serie) -> SerieChapter:
+    result = db.get(doc_id=serie["id"])
+    return result["last-chapter"] if result else None
 
 
-def save_chapter_data(serie: Serie, data: SerieChapter, redis: Redis) -> None:
-    redis.hset(f"{serie['store_key']}-last-chapter", mapping=data)  # type: ignore
+def save_chapter_data(serie: Serie, data: SerieChapter) -> None:
+    doc = Document({"last-chapter": data}, doc_id=serie["id"])
+    db.upsert(document=doc)
 
 
 def fetch_last_chapter(serie: Serie) -> SerieChapter:
@@ -86,7 +92,7 @@ def listen_for_updates(serie: Serie):
 
     async def _success_notifier(last_chapter: SerieChapter):
         try:
-            serie_data = load_chapter_data(serie, redis) or {
+            serie_data = load_chapter_data(serie) or {
                 **last_chapter,
                 "chapter_number": 0,
                 "chapter_url": "",
@@ -96,7 +102,7 @@ def listen_for_updates(serie: Serie):
                 return
 
             dispatch_new_chapter_notification(serie, serie_data, last_chapter)
-            save_chapter_data(serie, last_chapter, redis)
+            save_chapter_data(serie, last_chapter)
         except Exception as error:
             logger.error(repr(error), extra={"author": serie["title"]})
 
@@ -104,6 +110,7 @@ def listen_for_updates(serie: Serie):
         while True:
             wait_time_seconds = next_checking_seconds(datetime.now(), serie)
             await asyncio.sleep(wait_time_seconds)
+            # await asyncio.sleep(5)
 
             try:
                 result = await asyncio.to_thread(fetch_last_chapter, serie)
