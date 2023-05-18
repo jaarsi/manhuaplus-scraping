@@ -65,8 +65,7 @@ async def fetch_last_chapter(serie: types.Serie):
 def listen_for_updates(serie: types.Serie):
     async def _loop():
         while True:
-            # wait_time_seconds = next_checking_seconds(serie)
-            wait_time_seconds = 5
+            wait_time_seconds = next_checking_seconds(serie)
             await asyncio.sleep(wait_time_seconds)
 
             try:
