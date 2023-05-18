@@ -5,10 +5,11 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "manhuaplus_scraping",
+            "name": "series_scraping",
             "type": "python",
             "request": "launch",
-            "module": "manhuaplus_scraping",
+            "module": "series_scraping",
+            "args": ["scrape", "start"],
             "justMyCode": true
         }
     ]

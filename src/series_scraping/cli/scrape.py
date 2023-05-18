@@ -1,25 +1,21 @@
+import typer
 import asyncio
-import logging
-import logging.config
 import signal
+from .. import logging, database, discord_bot, settings, series
 
-from . import discord_bot, manhua, settings
-from .settings import LOGGING_CONFIG
+logger = logging.get_logger("series-scraping")
+app = typer.Typer()
 
 
-def main():
-    logging.config.dictConfig(LOGGING_CONFIG)
-    logger = logging.getLogger("manhuaplus_scraping")
+@app.command()
+def start():
     logger.info("Starting Manhuaplus scraping service.")
 
     async def _main():
-        _tasks = [
-            manhua.listen_for_updates(serie) for serie in settings.SERIES  # type: ignore
-        ]
-        _tasks.append(
-            discord_bot.start_discord_bot(settings.DISCORD_TOKEN, settings.SERIES)  # type: ignore
-        )
-        main_task = asyncio.gather(*_tasks)
+        _series = database.load_series()
+        tasks = [discord_bot.start_discord_bot(settings.DISCORD_TOKEN, _series)]
+        tasks.extend(map(series.listen_for_updates, _series))
+        main_task = asyncio.gather(*tasks)
 
         def _handle_shutdown(*args):
             logger.warning("Shutdown order received ...")
@@ -38,7 +34,3 @@ def main():
         pass
     finally:
         logger.info("Manhuaplus scraping service is down.")
-
-
-if __name__ == "__main__":
-    main()
