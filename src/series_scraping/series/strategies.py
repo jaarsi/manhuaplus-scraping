@@ -20,9 +20,14 @@ class SingleSelectorStrategy(SerieScanScrapingStrategy):
     selector: str = ""
 
     def fetch_last_chapter(self, serie: Serie) -> SerieChapter:
-        page_content = requests.get(
-            serie["url"], headers={"User-Agent": USER_AGENT}
-        ).text
+        response = requests.get(serie["url"], headers={"User-Agent": USER_AGENT})
+
+        if response.status_code != 200:
+            raise Exception(
+                f"Failed to fetch site content [status_code={response.status_code}]"
+            )
+
+        page_content = response.text
         soup = BeautifulSoup(page_content, "lxml")
         chapter_element = soup.select(self.selector)[0]
         chapter_description = chapter_element.text.strip()

@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 from datetime import datetime, timedelta
 
 from .. import logging, database
@@ -34,27 +35,24 @@ def next_checking_seconds(serie: types.Serie, reference: datetime = None) -> int
 
 
 def _process_new_chapter(serie: types.Serie, last_chapter: types.SerieChapter):
-    try:
-        serie_data = database.load_last_chapter(serie) or {
-            **last_chapter,
-            "chapter_number": 0,
-            "chapter_url": "",
-        }
+    serie_data = database.load_last_chapter(serie) or {
+        **last_chapter,
+        "chapter_number": 0,
+        "chapter_url": "",
+    }
 
-        if last_chapter["chapter_number"] <= int(serie_data["chapter_number"]):
-            return
+    if last_chapter["chapter_number"] <= int(serie_data["chapter_number"]):
+        return
 
-        logger.info(
-            "**New Chapter Available "
-            f"[{serie_data['chapter_number']} => "
-            f"{last_chapter['chapter_number']}]**\n"
-            f"{last_chapter['chapter_description']} \n"
-            f"{last_chapter['chapter_url']}",
-            extra={"author": serie["title"]},
-        )
-        database.save_last_chapter(serie, last_chapter)
-    except Exception as error:
-        logger.error(repr(error), extra={"author": serie["title"]})
+    logger.info(
+        "**New Chapter Available "
+        f"[{serie_data['chapter_number']} => "
+        f"{last_chapter['chapter_number']}]**\n"
+        f"{last_chapter['chapter_description']} \n"
+        f"{last_chapter['chapter_url']}",
+        extra={"author": serie["title"]},
+    )
+    database.save_last_chapter(serie, last_chapter)
 
 
 async def fetch_last_chapter(serie: types.Serie):
@@ -70,9 +68,9 @@ def listen_for_updates(serie: types.Serie):
 
             try:
                 result = await fetch_last_chapter(serie)
+                _process_new_chapter(serie, result)
             except Exception as error:
                 logger.error(repr(error), extra={"author": serie["title"]})
-            else:
-                _process_new_chapter(serie, result)
+                logger.debug(traceback.format_exc())
 
     return _loop()

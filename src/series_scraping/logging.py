@@ -20,14 +20,19 @@ LOGGING_CONFIG = {
         },
     },
     "handlers": {
-        "default": {"class": "logging.StreamHandler", "formatter": "default"},
+        "default": {
+            "class": "logging.StreamHandler",
+            "formatter": "default",
+            "level": "DEBUG",
+        },
         "discord": {
             "class": "series_scraping.logging.DiscordLoggingHandler",
             "formatter": "discord",
+            "level": "INFO",
         },
     },
     "loggers": {
-        "series-scraping": {"level": "INFO", "handlers": ["default", "discord"]}
+        "series-scraping": {"level": "DEBUG", "handlers": ["default", "discord"]}
     },
 }
 
