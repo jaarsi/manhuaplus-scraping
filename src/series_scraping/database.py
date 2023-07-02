@@ -1,7 +1,7 @@
 from tinydb import TinyDB, where
 from contextlib import contextmanager
 from .settings import DATABASE_FILE
-from .series import Serie, SerieChapter
+from .types import Serie, SerieChapter
 
 
 @contextmanager

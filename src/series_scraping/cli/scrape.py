@@ -1,7 +1,7 @@
 import typer
 import asyncio
 import signal
-from .. import logging, database, discord_bot, settings, series
+from .. import logging, database, discord_bot, settings, scraper
 
 logger = logging.get_logger("series-scraping")
 app = typer.Typer()
@@ -14,7 +14,7 @@ def start():
     async def _main():
         _series = database.load_series()
         tasks = [discord_bot.start_discord_bot(settings.DISCORD_TOKEN, _series)]
-        tasks.extend(map(series.listen_for_updates, _series))
+        tasks.extend(map(scraper.listen_for_updates, _series))
         main_task = asyncio.gather(*tasks)
 
         def _handle_shutdown(*args):

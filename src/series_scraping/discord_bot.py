@@ -4,12 +4,12 @@ from datetime import datetime, timedelta
 import arrow
 import discord
 
-from . import series
+from . import types, scraper
 
 GUILD_IDS = [961618505017483374]
 
 
-def start_discord_bot(discord_token: str, serie_list: list[series.Serie]):
+def start_discord_bot(discord_token: str, serie_list: list[types.Serie]):
     _series = {item["id"]: item for item in serie_list}
     bot = discord.Bot(intents=discord.Intents.all())
 
@@ -29,7 +29,7 @@ def start_discord_bot(discord_token: str, serie_list: list[series.Serie]):
         await ctx.respond(
             f"**Wait while im fetching the last chapter from {serie_name} ...**"
         )
-        last_chapter = await series.fetch_last_chapter(serie)
+        last_chapter = await scraper.fetch_last_chapter(serie)
         message = (
             f">>> **[ {serie['title']} ] Last Chapter Available "
             f"=> [{last_chapter['chapter_number']}]**\n"
@@ -49,7 +49,7 @@ def start_discord_bot(discord_token: str, serie_list: list[series.Serie]):
 
         for _, serie in _series.items():
             next_checking_at = now + timedelta(
-                seconds=series.next_checking_seconds(serie, now), minutes=1
+                seconds=scraper.next_checking_seconds(serie, now), minutes=1
             )
             human_time = arrow.get(next_checking_at).humanize(
                 other=now, granularity=["hour", "minute"]
