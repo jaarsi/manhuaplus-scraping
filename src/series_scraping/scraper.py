@@ -23,7 +23,7 @@ class SerieScanScrapingStrategy(Protocol):
 
 
 class SingleSelectorStrategy(SerieScanScrapingStrategy):
-    selector: str = ""
+    selector: str = None
 
     def fetch_last_chapter(self, serie: types.Serie) -> types.SerieChapter:
         response = requests.get(serie["url"], headers={"User-Agent": USER_AGENT})
@@ -83,7 +83,8 @@ def next_checking_seconds(serie: types.Serie, reference: datetime = None) -> int
 
 async def fetch_last_chapter(serie: types.Serie):
     scraper = strategies_mapping[serie["scan"]]
-    return await asyncio.to_thread(scraper.fetch_last_chapter, serie)
+    result = await asyncio.to_thread(scraper.fetch_last_chapter, serie)
+    return result
 
 
 def listen_for_updates(serie: types.Serie):
