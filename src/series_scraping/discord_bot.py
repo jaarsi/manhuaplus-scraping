@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import arrow
 import discord
 
-from . import types, scraper
+from . import scraper, types
 
 GUILD_IDS = [961618505017483374]
 

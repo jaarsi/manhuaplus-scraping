@@ -1,6 +1,6 @@
 import typer
-from . import scrape
-from . import serie
+
+from . import scrape, serie
 
 app = typer.Typer(name="series-scraping")
 app.add_typer(scrape.app, name="scrape")

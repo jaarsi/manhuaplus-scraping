@@ -1,7 +1,9 @@
-import logging.config
 import logging
-import requests
+import logging.config
 from typing import Literal
+
+import requests
+
 from .settings import DISCORD_WH
 
 DefaultLoggers = Literal["series-scraping"]
@@ -63,5 +65,5 @@ def setup_logging():
     logging.config.dictConfig(LOGGING_CONFIG)
 
 
-def get_logger(name: DefaultLoggers = None):
+def get_logger(name: DefaultLoggers | None = None):
     return logging.getLogger(name)

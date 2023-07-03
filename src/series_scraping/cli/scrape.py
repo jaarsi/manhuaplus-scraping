@@ -1,7 +1,9 @@
-import typer
 import asyncio
 import signal
-from .. import logging, database, discord_bot, settings, scraper
+
+import typer
+
+from .. import database, discord_bot, logging, scraper, settings
 
 logger = logging.get_logger("series-scraping")
 app = typer.Typer()

@@ -1,5 +1,6 @@
 import os
-from . import settings, logging, cli
+
+from . import cli, logging, settings
 
 logging.setup_logging()
 logger = logging.get_logger("series-scraping")

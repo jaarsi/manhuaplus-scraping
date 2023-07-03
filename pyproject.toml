@@ -25,3 +25,6 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
 ignore = ["F401"]
+
+[tool.mypy]
+ignore_missing_imports = true

@@ -1,12 +1,12 @@
 import asyncio
 import traceback
-from typing import Protocol
-import requests
 from datetime import datetime, timedelta
+from typing import Protocol, cast
 
-from . import types, logging, database
+import requests
 from bs4 import BeautifulSoup
 
+from . import database, logging, types
 
 logger = logging.get_logger("series-scraping")
 
@@ -23,7 +23,7 @@ class SerieScanScrapingStrategy(Protocol):
 
 
 class SingleSelectorStrategy(SerieScanScrapingStrategy):
-    selector: str = None
+    selector: str | None = None
 
     def fetch_last_chapter(self, serie: types.Serie) -> types.SerieChapter:
         response = requests.get(serie["url"], headers={"User-Agent": USER_AGENT})
@@ -35,7 +35,7 @@ class SingleSelectorStrategy(SerieScanScrapingStrategy):
 
         page_content = response.text
         soup = BeautifulSoup(page_content, "lxml")
-        chapter_element = soup.select(self.selector)[0]
+        chapter_element = soup.select(cast(str, self.selector))[0]
         chapter_description = chapter_element.text.strip()
         _, chapter_number, *_ = chapter_description.split()
         chapter_link = chapter_element.attrs["href"]
@@ -60,7 +60,7 @@ strategies_mapping: dict[types.SerieScan, SerieScanScrapingStrategy] = {
 }
 
 
-def next_checking_seconds(serie: types.Serie, reference: datetime = None) -> int:
+def next_checking_seconds(serie: types.Serie, reference: datetime | None = None) -> int:
     reference = reference or datetime.now()
 
     try:
@@ -88,25 +88,25 @@ async def fetch_last_chapter(serie: types.Serie):
 
 
 def listen_for_updates(serie: types.Serie):
-    def _process_new_chapter(last_chapter: types.SerieChapter):
+    def _process_new_chapter(new_chapter: types.SerieChapter):
         serie_data = database.load_last_chapter(serie) or {
-            **last_chapter,
+            **new_chapter,
             "chapter_number": 0,
             "chapter_url": "",
         }
 
-        if last_chapter["chapter_number"] <= int(serie_data["chapter_number"]):
+        if new_chapter["chapter_number"] <= int(serie_data["chapter_number"]):
             return
 
         logger.info(
             "**New Chapter Available "
             f"[{serie_data['chapter_number']} => "
-            f"{last_chapter['chapter_number']}]**\n"
-            f"{last_chapter['chapter_description']} \n"
-            f"{last_chapter['chapter_url']}",
+            f"{new_chapter['chapter_number']}]**\n"
+            f"{new_chapter['chapter_description']} \n"
+            f"{new_chapter['chapter_url']}",
             extra={"author": serie["title"]},
         )
-        database.save_last_chapter(serie, last_chapter)
+        database.save_last_chapter(serie, new_chapter)
 
     async def _loop():
         while True:
@@ -115,7 +115,7 @@ def listen_for_updates(serie: types.Serie):
 
             try:
                 result = await fetch_last_chapter(serie)
-                _process_new_chapter(serie, result)
+                _process_new_chapter(result)
             except Exception as error:
                 logger.error(repr(error), extra={"author": serie["title"]})
                 logger.debug(traceback.format_exc())

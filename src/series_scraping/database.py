@@ -1,5 +1,7 @@
-from tinydb import TinyDB, where
 from contextlib import contextmanager
+
+from tinydb import TinyDB, where
+
 from .settings import DATABASE_FILE
 from .types import Serie, SerieChapter
 
