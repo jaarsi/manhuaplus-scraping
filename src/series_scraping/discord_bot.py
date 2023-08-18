@@ -1,4 +1,3 @@
-import asyncio
 from datetime import datetime, timedelta
 
 import arrow
@@ -12,12 +11,6 @@ GUILD_IDS = [961618505017483374]
 def start_discord_bot(discord_token: str, serie_list: list[types.Serie]):
     _series = {item["id"]: item for item in serie_list}
     bot = discord.Bot(intents=discord.Intents.all())
-
-    @bot.slash_command(name="wait-for", guild_ids=GUILD_IDS)
-    async def _(ctx: discord.ApplicationContext, t: int):
-        await ctx.respond(f"waiting for {t} seconds")
-        await asyncio.sleep(t)
-        await ctx.respond("Done")
 
     @bot.slash_command(name="last-chapter", guild_ids=GUILD_IDS)
     @discord.option("serie_name", choices=[*_series.keys()])
