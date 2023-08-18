@@ -16,5 +16,6 @@ def add(id: str, title: str, url: str, scan: str, check_interval: str):
             "url": url,
             "scan": cast(types.SerieScan, scan),
             "check_interval": list(map(int, check_interval.split(","))),
+            "enabled": True,
         }
     )

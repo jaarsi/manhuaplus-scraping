@@ -9,6 +9,7 @@ class Serie(TypedDict):
     url: str
     scan: SerieScan
     check_interval: list[int]
+    enabled: bool
 
 
 class SerieChapter(TypedDict):

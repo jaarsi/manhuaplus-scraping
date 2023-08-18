@@ -14,13 +14,13 @@ def start():
     logger.info("Starting Manhuaplus scraping service.")
 
     async def _main():
-        _series = database.load_series()
+        _series = [_ for _ in database.load_series() if _["enabled"]]
         tasks = [discord_bot.start_discord_bot(settings.DISCORD_TOKEN, _series)]
         tasks.extend(map(scraper.listen_for_updates, _series))
         main_task = asyncio.gather(*tasks)
 
         def _handle_shutdown(*args):
-            logger.warning("Shutdown order received ...")
+            logger.info("Shutdown order received ...")
             main_task.cancel()
 
         loop = asyncio.get_event_loop()

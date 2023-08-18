@@ -26,7 +26,9 @@ class SingleSelectorStrategy(SerieScanScrapingStrategy):
     selector: str | None = None
 
     def fetch_last_chapter(self, serie: types.Serie) -> types.SerieChapter:
-        response = requests.get(serie["url"], headers={"User-Agent": USER_AGENT})
+        response = requests.get(
+            serie["url"], headers={"User-Agent": USER_AGENT}, allow_redirects=False
+        )
 
         if response.status_code != 200:
             raise Exception(
@@ -110,14 +112,14 @@ def listen_for_updates(serie: types.Serie):
 
     async def _loop():
         while True:
-            wait_time_seconds = next_checking_seconds(serie)
-            await asyncio.sleep(wait_time_seconds)
-
             try:
                 result = await fetch_last_chapter(serie)
                 _process_new_chapter(result)
             except Exception as error:
                 logger.error(repr(error), extra={"author": serie["title"]})
                 logger.debug(traceback.format_exc())
+            finally:
+                wait_time_seconds = next_checking_seconds(serie)
+                await asyncio.sleep(wait_time_seconds)
 
     return _loop()

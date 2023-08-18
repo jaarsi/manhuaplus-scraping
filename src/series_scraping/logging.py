@@ -14,11 +14,11 @@ LOGGING_CONFIG = {
     "formatters": {
         "default": {
             "()": "series_scraping.logging.CustomFormatter",
-            "format": "[ %(asctime)s ] [ %(author)s ] [ %(levelname)s ] %(message)s",
+            "format": "[ %(asctime)s ] [ %(author)s ] [ %(levelname)s ]\n%(message)s",
         },
         "discord": {
             "()": "series_scraping.logging.CustomFormatter",
-            "format": ">>> **[ %(author)s ] [ %(levelname)s ]** %(message)s",
+            "format": ">>> **[ %(author)s ] [ %(levelname)s ]**\n%(message)s",
         },
     },
     "handlers": {
