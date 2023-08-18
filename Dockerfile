@@ -4,4 +4,4 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /tmp/app
 COPY . .
 RUN pip install .
-CMD [ "python", "-m", "series_scraping", "scrape", "start" ]
+CMD [ "./start-service.sh" ]
