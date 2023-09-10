@@ -4,8 +4,9 @@ services:
     environment:
     -   DISCORD_WH=${DISCORD_WH}
     -   DISCORD_TOKEN=${DISCORD_TOKEN}
+    -   DATABASE_FILE=/root/database.json
     volumes:
-    -   "./docker:/root/.series-scraping"
+    -   "./docker:/root/"
     deploy:
       resources:
         limits:
