@@ -1,6 +1,6 @@
 import logging
 import logging.config
-from typing import Literal
+from typing import Literal, Optional
 
 import requests
 
@@ -65,5 +65,5 @@ def setup_logging():
     logging.config.dictConfig(LOGGING_CONFIG)
 
 
-def get_logger(name: DefaultLoggers | None = None):
+def get_logger(name: Optional[DefaultLoggers] = None):
     return logging.getLogger(name)

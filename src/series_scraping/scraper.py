@@ -1,7 +1,7 @@
 import asyncio
 import traceback
 from datetime import datetime, timedelta
-from typing import Protocol, cast
+from typing import Protocol, cast, Optional
 
 import requests
 from bs4 import BeautifulSoup
@@ -23,7 +23,7 @@ class SerieScanScrapingStrategy(Protocol):
 
 
 class SingleSelectorStrategy(SerieScanScrapingStrategy):
-    selector: str | None = None
+    selector: Optional[str] = None
 
     def fetch_last_chapter(self, serie: types.Serie) -> types.SerieChapter:
         response = requests.get(
@@ -49,7 +49,7 @@ class SingleSelectorStrategy(SerieScanScrapingStrategy):
 
 
 class ManhuaPlusStrategy(SingleSelectorStrategy):
-    selector = ".wp-manga-chapter:nth-child(1) a"
+    selector = "#myUL > li:nth-child(1) > a"
 
 
 class AsuraScansStrategy(SingleSelectorStrategy):
@@ -62,7 +62,7 @@ strategies_mapping: dict[types.SerieScan, SerieScanScrapingStrategy] = {
 }
 
 
-def next_checking_seconds(serie: types.Serie, reference: datetime | None = None) -> int:
+def next_checking_seconds(serie: types.Serie, reference: Optional[datetime] = None) -> int:
     reference = reference or datetime.now()
 
     try:
